@@ -1,3 +1,6 @@
 [submodule "packs/behavior/scripts/lib/fmbe-lib"]
 	path = packs/behavior/scripts/lib/fmbe-lib
 	url = git@github.com:kaaariyaaa/fmbe-lib.git
+[submodule "packs/behavior/scripts/lib/MCBEDatabase"]
+	path = packs/behavior/scripts/lib/MCBEDatabase
+	url = git@github.com:kaaariyaaa/MCBEDatabase.git
