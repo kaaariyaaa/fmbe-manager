@@ -18,6 +18,26 @@ import {
 import { now } from "./helpers.ts";
 import { type FmbePreset, type FmbeRecord } from "./types.ts";
 
+const ID_TAG_PREFIX = "fmbe:";
+
+function sanitizeIdForTag(id: string): string {
+  return id.replace(/[^a-zA-Z0-9_:\-./]/g, "_");
+}
+
+function getIdTag(id: string): string {
+  return `${ID_TAG_PREFIX}${sanitizeIdForTag(id)}`;
+}
+
+function syncIdTag(entity: Entity, id: string): void {
+  const expected = getIdTag(id);
+  for (const tag of entity.getTags()) {
+    if (!tag.startsWith(ID_TAG_PREFIX)) continue;
+    if (tag === expected) return;
+    entity.removeTag(tag);
+  }
+  entity.addTag(expected);
+}
+
 function getMainhandTypeId(record: FmbeRecord): string | undefined {
   if (record.preset === "item") {
     return record.itemTypeId ?? record.blockTypeId ?? undefined;
@@ -60,6 +80,7 @@ export function applyRecordToEntity(entity: Entity, record: FmbeRecord): void {
   entity.setDynamicProperty(DP_BLOCK, record.blockTypeId ?? undefined);
   entity.setDynamicProperty(DP_ITEM, record.itemTypeId ?? undefined);
   entity.setDynamicProperty(DP_EXTEND_ZROT, record.transform.extendZrot ?? undefined);
+  syncIdTag(entity, record.id);
 
   defaultFmbeManager.applyRenderData(entity, {
     type: presetToRenderType(record.preset),
@@ -70,6 +91,9 @@ export function applyRecordToEntity(entity: Entity, record: FmbeRecord): void {
 }
 
 export function removeManagedEntity(entity: Entity): void {
+  for (const tag of entity.getTags()) {
+    if (tag.startsWith(ID_TAG_PREFIX)) entity.removeTag(tag);
+  }
   entity.setDynamicProperty(DP_MANAGED, undefined);
   entity.setDynamicProperty(DP_ID, undefined);
   entity.setDynamicProperty(DP_PRESET, undefined);
