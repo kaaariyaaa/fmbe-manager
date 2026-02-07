@@ -17,6 +17,7 @@ import {
 } from "./helpers.ts";
 import { now } from "./helpers.ts";
 import { type FmbePreset, type FmbeRecord } from "./types.ts";
+import { removeEntityScores, syncEntityScores } from "./scoreboard.ts";
 
 const ID_TAG_PREFIX = "fmbe:";
 
@@ -81,6 +82,7 @@ export function applyRecordToEntity(entity: Entity, record: FmbeRecord): void {
   entity.setDynamicProperty(DP_ITEM, record.itemTypeId ?? undefined);
   entity.setDynamicProperty(DP_EXTEND_ZROT, record.transform.extendZrot ?? undefined);
   syncIdTag(entity, record.id);
+  syncEntityScores(entity, record);
 
   defaultFmbeManager.applyRenderData(entity, {
     type: presetToRenderType(record.preset),
@@ -91,6 +93,7 @@ export function applyRecordToEntity(entity: Entity, record: FmbeRecord): void {
 }
 
 export function removeManagedEntity(entity: Entity): void {
+  removeEntityScores(entity);
   for (const tag of entity.getTags()) {
     if (tag.startsWith(ID_TAG_PREFIX)) entity.removeTag(tag);
   }
@@ -130,9 +133,8 @@ export function findEntityByFmbeId(id: string): Entity | undefined {
   return undefined;
 }
 
-export function resolveTargetEntity(origin: CustomCommandOrigin, entityArg?: Entity, idArg?: string): Entity | undefined {
+export function resolveTargetEntity(origin: CustomCommandOrigin, entityArg?: Entity): Entity | undefined {
   if (entityArg && isManagedEntity(entityArg)) return entityArg;
-  if (idArg) return findEntityByFmbeId(idArg);
 
   const player = getOriginPlayer(origin);
   if (!player) return undefined;

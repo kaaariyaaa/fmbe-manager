@@ -17,7 +17,6 @@ import { addPendingGet } from "./state.ts";
 import { getAllRecords, getRecordById, removeRecordById, upsertRecord } from "./db.ts";
 import {
   applyRecordToEntity,
-  findEntityByFmbeId,
   getAllManagedEntities,
   isManagedEntity,
   removeManagedEntity,
@@ -26,16 +25,16 @@ import {
   toEntityRecord,
 } from "./entities.ts";
 import {
+  DP_ID,
   formatRecord,
+  generateUuidLike,
   getOriginPlayer,
-  isNamespacedId,
   now,
   presetFromAnyEnum,
   presetFromBlockEnum,
   presetToDisplay,
   sendToOrigin,
   toTransform,
-  DP_ID,
 } from "./helpers.ts";
 import { type FmbeDataMode, type FmbeRecord } from "./types.ts";
 
@@ -58,7 +57,13 @@ function registerManagedCommand(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    world.sendMessage(`§c[FMBE] command register failed: ${command.name} (${message})`);
+    system.run(() => {
+      try {
+        world.sendMessage(`§c[FMBE] command register failed: ${command.name} (${message})`);
+      } catch {
+        // ignore when world messaging is unavailable
+      }
+    });
   }
 }
 
@@ -69,6 +74,22 @@ function commandBase(name: string, description: string): CustomCommand {
     cheatsRequired: true,
     permissionLevel: CommandPermissionLevel.GameDirectors,
   };
+}
+
+function generateRecordId(): string {
+  let id = `fmbe:${generateUuidLike()}`;
+  while (getRecordById(id)) {
+    id = `fmbe:${generateUuidLike()}`;
+  }
+  return id;
+}
+
+function getEntityRecordOrThrow(target: Entity): FmbeRecord {
+  const targetId = target.getDynamicProperty(DP_ID);
+  if (typeof targetId !== "string") throw new Error("target has no fmbe id.");
+  const row = getRecordById(targetId);
+  if (!row) throw new Error(`record missing for ${targetId}`);
+  return row;
 }
 
 export function registerCommands(): void {
@@ -85,7 +106,6 @@ export function registerCommands(): void {
       {
         ...commandBase("fmbe:new_block", "Create a new FMBE block"),
         mandatoryParameters: [
-          { type: CustomCommandParamType.String, name: "id" },
           { type: CustomCommandParamType.BlockType, name: "block" },
           { type: CustomCommandParamType.Enum, name: "preset", enumName: "fmbe:new_block_preset" },
         ],
@@ -97,11 +117,8 @@ export function registerCommands(): void {
           { type: CustomCommandParamType.Float, name: "scale" },
         ],
       },
-      (origin, id, block, preset, location, xOffset, yOffset, zOffset, scale) => {
-        const fmbeId = String(id ?? "");
-        if (!isNamespacedId(fmbeId)) throw new Error("id must be namespaced. e.g. fmbe:sample");
-        if (getRecordById(fmbeId)) throw new Error(`id already exists: ${fmbeId}`);
-
+      (origin, block, preset, location, xOffset, yOffset, zOffset, scale) => {
+        const fmbeId = generateRecordId();
         const blockTypeId = (block as BlockType).id;
         const presetValue = presetFromBlockEnum(String(preset));
 
@@ -109,13 +126,6 @@ export function registerCommands(): void {
         const sourceDimensionId = sourcePlayer?.dimension.id ?? MinecraftDimensionTypes.Overworld;
         const sourceLocation = sourcePlayer?.location ?? { x: 0, y: 80, z: 0 };
         const spawnLocation = (location as Vector3 | undefined) ?? sourceLocation;
-
-        const transform = toTransform({
-          xOffset,
-          yOffset,
-          zOffset,
-          scale,
-        });
 
         const record: FmbeRecord = {
           id: fmbeId,
@@ -126,7 +136,7 @@ export function registerCommands(): void {
           x: spawnLocation.x,
           y: spawnLocation.y,
           z: spawnLocation.z,
-          transform,
+          transform: toTransform({ xOffset, yOffset, zOffset, scale }),
           updatedAt: now(),
         };
 
@@ -141,7 +151,6 @@ export function registerCommands(): void {
       {
         ...commandBase("fmbe:new_item", "Create a new FMBE item"),
         mandatoryParameters: [
-          { type: CustomCommandParamType.String, name: "id" },
           { type: CustomCommandParamType.ItemType, name: "item" },
           { type: CustomCommandParamType.Location, name: "location" },
         ],
@@ -152,23 +161,13 @@ export function registerCommands(): void {
           { type: CustomCommandParamType.Float, name: "scale" },
         ],
       },
-      (origin, id, item, location, xOffset, yOffset, zOffset, scale) => {
-        const fmbeId = String(id ?? "");
-        if (!isNamespacedId(fmbeId)) throw new Error("id must be namespaced. e.g. fmbe:sample");
-        if (getRecordById(fmbeId)) throw new Error(`id already exists: ${fmbeId}`);
-
+      (origin, item, location, xOffset, yOffset, zOffset, scale) => {
+        const fmbeId = generateRecordId();
         const itemTypeId = (item as ItemType).id;
         const sourcePlayer = getOriginPlayer(origin);
         const sourceDimensionId = sourcePlayer?.dimension.id ?? MinecraftDimensionTypes.Overworld;
-
-        const transform = toTransform({
-          xOffset,
-          yOffset,
-          zOffset,
-          scale,
-        });
-
         const spawnLocation = location as Vector3;
+
         const record: FmbeRecord = {
           id: fmbeId,
           preset: "item",
@@ -178,7 +177,7 @@ export function registerCommands(): void {
           x: spawnLocation.x,
           y: spawnLocation.y,
           z: spawnLocation.z,
-          transform,
+          transform: toTransform({ xOffset, yOffset, zOffset, scale }),
           updatedAt: now(),
         };
 
@@ -204,9 +203,7 @@ export function registerCommands(): void {
         }
 
         sendToOrigin(origin, `§b[FMBE] ${filtered.length} entries`);
-        for (const row of filtered) {
-          sendToOrigin(origin, `§7- ${formatRecord(row)}`);
-        }
+        for (const row of filtered) sendToOrigin(origin, `§7- ${formatRecord(row)}`);
       }
     );
 
@@ -214,34 +211,19 @@ export function registerCommands(): void {
       registry,
       {
         ...commandBase("fmbe:get", "Get FMBE data"),
-        optionalParameters: [{ type: CustomCommandParamType.String, name: "id" }],
+        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
       },
-      (origin, id) => {
-        const fmbeId = typeof id === "string" ? id : undefined;
-
-        if (fmbeId) {
-          const row = getRecordById(fmbeId);
-          if (!row) throw new Error(`id not found: ${fmbeId}`);
+      (origin, entity) => {
+        const target = resolveTargetEntity(origin, entity as Entity | undefined);
+        if (target) {
+          const row = getEntityRecordOrThrow(target);
           sendToOrigin(origin, `§b[FMBE] ${formatRecord(row)}`);
           sendToOrigin(origin, `§7transform=${JSON.stringify(row.transform)}`);
           return;
         }
 
-        const target = resolveTargetEntity(origin);
-        if (target) {
-          const targetId = target.getDynamicProperty(DP_ID);
-          if (typeof targetId === "string") {
-            const row = getRecordById(targetId);
-            if (row) {
-              sendToOrigin(origin, `§b[FMBE] ${formatRecord(row)}`);
-              sendToOrigin(origin, `§7transform=${JSON.stringify(row.transform)}`);
-              return;
-            }
-          }
-        }
-
         const player = getOriginPlayer(origin);
-        if (!player) throw new Error("id omitted and no player context.");
+        if (!player) throw new Error("entity omitted and no player context.");
         addPendingGet(player.id);
         sendToOrigin(origin, "§e[FMBE] hit an FMBE to inspect it.");
       }
@@ -250,55 +232,20 @@ export function registerCommands(): void {
     registerManagedCommand(
       registry,
       {
-        ...commandBase("fmbe:set_id", "Change FMBE id"),
-        mandatoryParameters: [
-          { type: CustomCommandParamType.String, name: "beforeId" },
-          { type: CustomCommandParamType.String, name: "afterId" },
-        ],
-      },
-      (origin, beforeId, afterId) => {
-        const oldId = String(beforeId ?? "");
-        const newId = String(afterId ?? "");
-        if (!isNamespacedId(newId)) throw new Error("afterId must be namespaced.");
-
-        const row = getRecordById(oldId);
-        if (!row) throw new Error(`id not found: ${oldId}`);
-        if (getRecordById(newId)) throw new Error(`id already exists: ${newId}`);
-
-        const target = findEntityByFmbeId(oldId);
-        const next: FmbeRecord = { ...row, id: newId, updatedAt: now() };
-        removeRecordById(oldId);
-        upsertRecord(next);
-        if (target) target.setDynamicProperty(DP_ID, newId);
-        sendToOrigin(origin, `§a[FMBE] id changed ${oldId} -> ${newId}`);
-      }
-    );
-
-    registerManagedCommand(
-      registry,
-      {
         ...commandBase("fmbe:set_preset", "Set preset"),
         mandatoryParameters: [{ type: CustomCommandParamType.Enum, name: "preset", enumName: "fmbe:set_preset" }],
-        optionalParameters: [
-          { type: CustomCommandParamType.EntitySelector, name: "entity" },
-          { type: CustomCommandParamType.String, name: "id" },
-        ],
+        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
       },
-      (origin, preset, entity, id) => {
-        const target = resolveTargetEntity(origin, entity as Entity | undefined, id as string | undefined);
-        if (!target) throw new Error("target not found. specify entity/id or hit target first.");
+      (origin, preset, entity) => {
+        const target = resolveTargetEntity(origin, entity as Entity | undefined);
+        if (!target) throw new Error("target not found. specify entity or hit target first.");
 
-        const targetId = target.getDynamicProperty(DP_ID);
-        if (typeof targetId !== "string") throw new Error("target has no fmbe:id.");
-
-        const row = getRecordById(targetId);
-        if (!row) throw new Error(`id not found in DB: ${targetId}`);
-
+        const row = getEntityRecordOrThrow(target);
         const nextPreset = presetFromAnyEnum(String(preset));
         const next: FmbeRecord = { ...row, preset: nextPreset, updatedAt: now() };
         upsertRecord(next);
         applyRecordToEntity(target, next);
-        sendToOrigin(origin, `§a[FMBE] preset updated: ${targetId} -> ${presetToDisplay(nextPreset)}`);
+        sendToOrigin(origin, `§a[FMBE] preset updated: ${row.id} -> ${presetToDisplay(nextPreset)}`);
       }
     );
 
@@ -307,20 +254,13 @@ export function registerCommands(): void {
       {
         ...commandBase("fmbe:set_block", "Set block type"),
         mandatoryParameters: [{ type: CustomCommandParamType.BlockType, name: "block" }],
-        optionalParameters: [
-          { type: CustomCommandParamType.EntitySelector, name: "entity" },
-          { type: CustomCommandParamType.String, name: "id" },
-        ],
+        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
       },
-      (origin, block, entity, id) => {
-        const target = resolveTargetEntity(origin, entity as Entity | undefined, id as string | undefined);
-        if (!target) throw new Error("target not found. specify entity/id or hit target first.");
+      (origin, block, entity) => {
+        const target = resolveTargetEntity(origin, entity as Entity | undefined);
+        if (!target) throw new Error("target not found. specify entity or hit target first.");
 
-        const targetId = target.getDynamicProperty(DP_ID);
-        if (typeof targetId !== "string") throw new Error("target has no fmbe:id.");
-
-        const row = getRecordById(targetId);
-        if (!row) throw new Error(`id not found in DB: ${targetId}`);
+        const row = getEntityRecordOrThrow(target);
         const next: FmbeRecord = {
           ...row,
           blockTypeId: (block as BlockType).id,
@@ -329,7 +269,7 @@ export function registerCommands(): void {
         };
         upsertRecord(next);
         applyRecordToEntity(target, next);
-        sendToOrigin(origin, `§a[FMBE] block updated: ${targetId} -> ${next.blockTypeId}`);
+        sendToOrigin(origin, `§a[FMBE] block updated: ${row.id} -> ${next.blockTypeId}`);
       }
     );
 
@@ -338,20 +278,13 @@ export function registerCommands(): void {
       {
         ...commandBase("fmbe:set_item", "Set item type"),
         mandatoryParameters: [{ type: CustomCommandParamType.ItemType, name: "item" }],
-        optionalParameters: [
-          { type: CustomCommandParamType.EntitySelector, name: "entity" },
-          { type: CustomCommandParamType.String, name: "id" },
-        ],
+        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
       },
-      (origin, item, entity, id) => {
-        const target = resolveTargetEntity(origin, entity as Entity | undefined, id as string | undefined);
-        if (!target) throw new Error("target not found. specify entity/id or hit target first.");
+      (origin, item, entity) => {
+        const target = resolveTargetEntity(origin, entity as Entity | undefined);
+        if (!target) throw new Error("target not found. specify entity or hit target first.");
 
-        const targetId = target.getDynamicProperty(DP_ID);
-        if (typeof targetId !== "string") throw new Error("target has no fmbe:id.");
-
-        const row = getRecordById(targetId);
-        if (!row) throw new Error(`id not found in DB: ${targetId}`);
+        const row = getEntityRecordOrThrow(target);
         const next: FmbeRecord = {
           ...row,
           itemTypeId: (item as ItemType).id,
@@ -360,7 +293,7 @@ export function registerCommands(): void {
         };
         upsertRecord(next);
         applyRecordToEntity(target, next);
-        sendToOrigin(origin, `§a[FMBE] item updated: ${targetId} -> ${next.itemTypeId}`);
+        sendToOrigin(origin, `§a[FMBE] item updated: ${row.id} -> ${next.itemTypeId}`);
       }
     );
 
@@ -369,21 +302,13 @@ export function registerCommands(): void {
       {
         ...commandBase("fmbe:set_location", "Set FMBE location"),
         mandatoryParameters: [{ type: CustomCommandParamType.Location, name: "location" }],
-        optionalParameters: [
-          { type: CustomCommandParamType.EntitySelector, name: "entity" },
-          { type: CustomCommandParamType.String, name: "id" },
-        ],
+        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
       },
-      (origin, location, entity, id) => {
-        const target = resolveTargetEntity(origin, entity as Entity | undefined, id as string | undefined);
-        if (!target) throw new Error("target not found. specify entity/id or hit target first.");
+      (origin, location, entity) => {
+        const target = resolveTargetEntity(origin, entity as Entity | undefined);
+        if (!target) throw new Error("target not found. specify entity or hit target first.");
 
-        const targetId = target.getDynamicProperty(DP_ID);
-        if (typeof targetId !== "string") throw new Error("target has no fmbe:id.");
-
-        const row = getRecordById(targetId);
-        if (!row) throw new Error(`id not found in DB: ${targetId}`);
-
+        const row = getEntityRecordOrThrow(target);
         const pos = location as Vector3;
         target.teleport(pos);
         const next: FmbeRecord = {
@@ -395,44 +320,54 @@ export function registerCommands(): void {
           updatedAt: now(),
         };
         upsertRecord(next);
-        sendToOrigin(origin, `§a[FMBE] moved: ${targetId}`);
+        sendToOrigin(origin, `§a[FMBE] moved: ${row.id}`);
       }
     );
 
     registerManagedCommand(
       registry,
       {
-        ...commandBase("fmbe:clone", "Clone FMBE record"),
-        mandatoryParameters: [
-          { type: CustomCommandParamType.String, name: "fromId" },
-          { type: CustomCommandParamType.String, name: "toId" },
+        ...commandBase("fmbe:clone", "Clone FMBE by entity"),
+        mandatoryParameters: [{ type: CustomCommandParamType.EntitySelector, name: "fromEntity" }],
+        optionalParameters: [
+          { type: CustomCommandParamType.EntitySelector, name: "toEntity" },
+          { type: CustomCommandParamType.Location, name: "location" },
         ],
-        optionalParameters: [{ type: CustomCommandParamType.Location, name: "location" }],
       },
-      (origin, fromId, toId, location) => {
-        const from = getRecordById(String(fromId ?? ""));
-        if (!from) throw new Error(`fromId not found: ${String(fromId ?? "")}`);
-        const toIdValue = String(toId ?? "");
-        if (!isNamespacedId(toIdValue)) throw new Error("toId must be namespaced.");
+      (origin, fromEntity, toEntity, location) => {
+        const from = fromEntity as Entity | undefined;
+        if (!from || !isManagedEntity(from)) throw new Error("fromEntity must be an FMBE.");
+        const fromRow = getEntityRecordOrThrow(from);
 
-        const toExisting = getRecordById(toIdValue);
-        const toEntity = findEntityByFmbeId(toIdValue);
+        const target = toEntity as Entity | undefined;
+        const specifiedLoc = location as Vector3 | undefined;
 
+        if (target && isManagedEntity(target)) {
+          const toRow = getEntityRecordOrThrow(target);
+          const next: FmbeRecord = {
+            ...fromRow,
+            id: toRow.id,
+            dimensionId: specifiedLoc ? target.dimension.id : toRow.dimensionId,
+            x: specifiedLoc ? specifiedLoc.x : toRow.x,
+            y: specifiedLoc ? specifiedLoc.y : toRow.y,
+            z: specifiedLoc ? specifiedLoc.z : toRow.z,
+            updatedAt: now(),
+          };
+          if (specifiedLoc) target.teleport(specifiedLoc);
+          upsertRecord(next);
+          applyRecordToEntity(target, next);
+          sendToOrigin(origin, `§a[FMBE] cloned to existing entity: ${next.id}`);
+          return;
+        }
+
+        const cloneId = generateRecordId();
+        const originPlayer = getOriginPlayer(origin);
         const cloneBase: FmbeRecord = {
-          ...from,
-          id: toIdValue,
+          ...fromRow,
+          id: cloneId,
           updatedAt: now(),
         };
-
-        const specifiedLoc = location as Vector3 | undefined;
-        if (toExisting && !specifiedLoc) {
-          cloneBase.dimensionId = toExisting.dimensionId;
-          cloneBase.x = toExisting.x;
-          cloneBase.y = toExisting.y;
-          cloneBase.z = toExisting.z;
-        }
         if (specifiedLoc) {
-          const originPlayer = getOriginPlayer(origin);
           cloneBase.dimensionId = originPlayer?.dimension.id ?? cloneBase.dimensionId;
           cloneBase.x = specifiedLoc.x;
           cloneBase.y = specifiedLoc.y;
@@ -440,15 +375,8 @@ export function registerCommands(): void {
         }
 
         upsertRecord(cloneBase);
-
-        if (toEntity) {
-          if (specifiedLoc) toEntity.teleport(specifiedLoc);
-          applyRecordToEntity(toEntity, cloneBase);
-        } else {
-          spawnFromRecord(cloneBase);
-        }
-
-        sendToOrigin(origin, `§a[FMBE] cloned: ${from.id} -> ${toIdValue}`);
+        const cloned = spawnFromRecord(cloneBase);
+        sendToOrigin(origin, `§a[FMBE] cloned new: ${cloneBase.id} runtimeId=${cloned.id}`);
       }
     );
 
@@ -456,21 +384,16 @@ export function registerCommands(): void {
       registry,
       {
         ...commandBase("fmbe:remove", "Remove FMBE"),
-        optionalParameters: [
-          { type: CustomCommandParamType.EntitySelector, name: "entity" },
-          { type: CustomCommandParamType.String, name: "id" },
-        ],
+        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
       },
-      (origin, entity, id) => {
-        const target = resolveTargetEntity(origin, entity as Entity | undefined, id as string | undefined);
-        if (!target) throw new Error("target not found. specify entity/id or hit target first.");
+      (origin, entity) => {
+        const target = resolveTargetEntity(origin, entity as Entity | undefined);
+        if (!target) throw new Error("target not found. specify entity or hit target first.");
 
-        const targetId = target.getDynamicProperty(DP_ID);
-        if (typeof targetId !== "string") throw new Error("target has no fmbe:id.");
-
-        removeRecordById(targetId);
+        const row = getEntityRecordOrThrow(target);
+        removeRecordById(row.id);
         removeManagedEntity(target);
-        sendToOrigin(origin, `§a[FMBE] removed: ${targetId}`);
+        sendToOrigin(origin, `§a[FMBE] removed: ${row.id}`);
       }
     );
 
@@ -479,43 +402,25 @@ export function registerCommands(): void {
       {
         ...commandBase("fmbe:data", "Synchronize data and entities"),
         mandatoryParameters: [{ type: CustomCommandParamType.Enum, name: "content", enumName: "fmbe:data_content" }],
-        optionalParameters: [
-          { type: CustomCommandParamType.EntitySelector, name: "entity" },
-          { type: CustomCommandParamType.String, name: "id" },
-        ],
+        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
       },
-      (origin, content, entity, id) => {
+      (origin, content, entity) => {
         const mode = String(content) as FmbeDataMode;
         const scopeEntity = entity as Entity | undefined;
-        const scopeId = id as string | undefined;
 
-        const scopedFmbeId =
-          scopeId ??
-          (() => {
-            if (!scopeEntity) return undefined;
-            const value = scopeEntity.getDynamicProperty(DP_ID);
-            return typeof value === "string" ? value : undefined;
-          })();
+        const scopedId = scopeEntity?.getDynamicProperty(DP_ID);
+        const targetId = typeof scopedId === "string" ? scopedId : undefined;
 
-        const dbRecords = scopedFmbeId
+        const dbRecords = targetId
           ? (() => {
-              const row = getRecordById(scopedFmbeId);
+              const row = getRecordById(targetId);
               return row ? [row] : [];
             })()
           : getAllRecords();
         const dbMap = new Map<string, FmbeRecord>();
         for (const row of dbRecords) dbMap.set(row.id, row);
 
-        const entities = scopeEntity
-          ? isManagedEntity(scopeEntity)
-            ? [scopeEntity]
-            : []
-          : scopeId
-            ? (() => {
-                const byId = findEntityByFmbeId(scopeId);
-                return byId ? [byId] : [];
-              })()
-            : getAllManagedEntities();
+        const entities = scopeEntity ? (isManagedEntity(scopeEntity) ? [scopeEntity] : []) : getAllManagedEntities();
         const entityMap = new Map<string, Entity>();
         for (const ent of entities) {
           const entityId = ent.getDynamicProperty(DP_ID);
@@ -579,12 +484,7 @@ export function registerCommands(): void {
             continue;
           }
 
-          if (
-            ent.dimension.id !== row.dimensionId ||
-            ent.location.x !== row.x ||
-            ent.location.y !== row.y ||
-            ent.location.z !== row.z
-          ) {
+          if (ent.dimension.id !== row.dimensionId || ent.location.x !== row.x || ent.location.y !== row.y || ent.location.z !== row.z) {
             const targetDimension = world.getDimension(row.dimensionId);
             ent.teleport({ x: row.x, y: row.y, z: row.z }, { dimension: targetDimension });
           }

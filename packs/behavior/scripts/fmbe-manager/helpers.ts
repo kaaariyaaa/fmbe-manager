@@ -22,6 +22,11 @@ export function isNamespacedId(id: string): boolean {
   return /^[a-z0-9_\-.]+:[a-z0-9_\-./]+$/i.test(id);
 }
 
+export function generateUuidLike(): string {
+  const part = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, "0");
+  return `${part()}${part()}-${part()}-${part()}-${part()}-${part()}${part()}${part()}`;
+}
+
 export function asNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }

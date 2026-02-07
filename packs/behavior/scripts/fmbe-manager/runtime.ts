@@ -2,7 +2,7 @@ import { system, world } from "@minecraft/server";
 import { getAllRecords, upsertRecord } from "./db.ts";
 import { applyRecordToEntity, getAllManagedEntities } from "./entities.ts";
 import { DP_ID, now } from "./helpers.ts";
-import { readRecordFromScores, syncRecordScores } from "./scoreboard.ts";
+import { readRecordFromEntityScores, syncEntityScores } from "./scoreboard.ts";
 
 function isSameLocation(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }): boolean {
   return Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01 && Math.abs(a.z - b.z) < 0.01;
@@ -21,7 +21,10 @@ export function registerRuntimeSync(): void {
     }
 
     for (const record of records) {
-      const scoreUpdate = readRecordFromScores(record);
+      const entity = entityMap.get(record.id);
+      if (!entity) continue;
+
+      const scoreUpdate = readRecordFromEntityScores(entity, record);
       const effectiveRecord = scoreUpdate.changed
         ? {
             ...scoreUpdate.record,
@@ -32,11 +35,8 @@ export function registerRuntimeSync(): void {
       if (scoreUpdate.changed) {
         upsertRecord(effectiveRecord);
       } else {
-        syncRecordScores(record);
+        syncEntityScores(entity, record);
       }
-
-      const entity = entityMap.get(effectiveRecord.id);
-      if (!entity) continue;
 
       if (entity.dimension.id !== effectiveRecord.dimensionId || !isSameLocation(entity.location, effectiveRecord)) {
         entity.teleport(

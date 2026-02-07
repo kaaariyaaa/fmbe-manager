@@ -1,7 +1,6 @@
 import { world } from "@minecraft/server";
 import { MinecraftDimensionTypes } from "@minecraft/vanilla-data";
 import { now, parseTransformJson } from "./helpers.ts";
-import { removeRecordScores, syncRecordScores } from "./scoreboard.ts";
 import { type FmbeRecord } from "./types.ts";
 
 const STORE_KEY = "fmbe:records";
@@ -42,6 +41,7 @@ function save(): void {
 }
 
 function toRecord(row: Record<string, unknown>): FmbeRecord {
+  const transformFromRow = row.transform as FmbeRecord["transform"] | undefined;
   return {
     id: String(row.id ?? ""),
     preset: String(row.preset ?? "item") as FmbeRecord["preset"],
@@ -51,7 +51,7 @@ function toRecord(row: Record<string, unknown>): FmbeRecord {
     x: Number(row.x ?? 0),
     y: Number(row.y ?? 0),
     z: Number(row.z ?? 0),
-    transform: parseTransformJson(row.transformJson),
+    transform: transformFromRow ?? parseTransformJson(row.transformJson),
     updatedAt: Number(row.updatedAt ?? now()),
   };
 }
@@ -64,7 +64,6 @@ export function upsertRecord(record: FmbeRecord): void {
   ensureLoaded();
   records.set(record.id, { ...record });
   save();
-  syncRecordScores(record);
 }
 
 export function getRecordById(id: string): FmbeRecord | undefined {
@@ -84,5 +83,4 @@ export function removeRecordById(id: string): void {
   ensureLoaded();
   records.delete(id);
   save();
-  removeRecordScores(id);
 }

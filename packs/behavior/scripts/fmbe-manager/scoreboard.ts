@@ -1,5 +1,5 @@
-import { world } from "@minecraft/server";
-import { type StoredTransform, type FmbeRecord } from "./types.ts";
+import { world, type Entity } from "@minecraft/server";
+import { type FmbeRecord, type StoredTransform } from "./types.ts";
 
 const SCALE = 1000;
 
@@ -77,73 +77,48 @@ function almostEqual(a: number, b: number): boolean {
   return Math.abs(a - b) < 1 / SCALE;
 }
 
-export function syncRecordTransformScores(record: FmbeRecord): void {
+export function syncEntityScores(entity: Entity, record: FmbeRecord): void {
   for (const [key, objectiveId] of Object.entries(SCORE_OBJECTIVES) as Array<[keyof StoredTransform, string]>) {
-    const objective = getObjective(objectiveId);
-    objective.setScore(record.id, toScore(getTransformValue(record.transform, key)));
+    getObjective(objectiveId).setScore(entity, toScore(getTransformValue(record.transform, key)));
   }
+
+  getObjective(LOCATION_OBJECTIVES.x).setScore(entity, toScore(record.x));
+  getObjective(LOCATION_OBJECTIVES.y).setScore(entity, toScore(record.y));
+  getObjective(LOCATION_OBJECTIVES.z).setScore(entity, toScore(record.z));
+  getObjective(PRESET_OBJECTIVE).setScore(entity, PRESET_TO_SCORE[record.preset]);
 }
 
-export function syncRecordScores(record: FmbeRecord): void {
-  syncRecordTransformScores(record);
-
-  getObjective(LOCATION_OBJECTIVES.x).setScore(record.id, toScore(record.x));
-  getObjective(LOCATION_OBJECTIVES.y).setScore(record.id, toScore(record.y));
-  getObjective(LOCATION_OBJECTIVES.z).setScore(record.id, toScore(record.z));
-  getObjective(PRESET_OBJECTIVE).setScore(record.id, PRESET_TO_SCORE[record.preset]);
-}
-
-export function removeRecordTransformScores(fmbeId: string): void {
-  for (const objectiveId of Object.values(SCORE_OBJECTIVES)) {
+export function removeEntityScores(entity: Entity): void {
+  const allObjectives = [...Object.values(SCORE_OBJECTIVES), LOCATION_OBJECTIVES.x, LOCATION_OBJECTIVES.y, LOCATION_OBJECTIVES.z, PRESET_OBJECTIVE];
+  for (const objectiveId of allObjectives) {
     const objective = world.scoreboard.getObjective(objectiveId);
     if (!objective) continue;
-    objective.removeParticipant(fmbeId);
+    objective.removeParticipant(entity);
   }
 }
 
-export function removeRecordScores(fmbeId: string): void {
-  removeRecordTransformScores(fmbeId);
-
-  const locationObjectives = [LOCATION_OBJECTIVES.x, LOCATION_OBJECTIVES.y, LOCATION_OBJECTIVES.z, PRESET_OBJECTIVE];
-  for (const objectiveId of locationObjectives) {
-    const objective = world.scoreboard.getObjective(objectiveId);
-    if (!objective) continue;
-    objective.removeParticipant(fmbeId);
-  }
-}
-
-export function readTransformFromScores(fmbeId: string, current: StoredTransform): { changed: boolean; transform: StoredTransform } {
-  const next: StoredTransform = { ...current };
+export function readRecordFromEntityScores(entity: Entity, record: FmbeRecord): { changed: boolean; record: FmbeRecord } {
+  const next: FmbeRecord = {
+    ...record,
+    transform: { ...record.transform },
+  };
   let changed = false;
 
   for (const [key, objectiveId] of Object.entries(SCORE_OBJECTIVES) as Array<[keyof StoredTransform, string]>) {
     const objective = world.scoreboard.getObjective(objectiveId);
     if (!objective) continue;
-
-    const score = objective.getScore(fmbeId);
+    const score = objective.getScore(entity);
     if (score === undefined) continue;
 
     const value = fromScore(score);
-    const prev = getTransformValue(next, key);
+    const prev = getTransformValue(next.transform, key);
     if (almostEqual(prev, value)) continue;
 
-    next[key] = value;
+    next.transform[key] = value;
     changed = true;
   }
 
-  return { changed, transform: next };
-}
-
-export function readRecordFromScores(record: FmbeRecord): { changed: boolean; record: FmbeRecord } {
-  const transformResult = readTransformFromScores(record.id, record.transform);
-
-  let changed = transformResult.changed;
-  const next: FmbeRecord = {
-    ...record,
-    transform: transformResult.transform,
-  };
-
-  const xScore = world.scoreboard.getObjective(LOCATION_OBJECTIVES.x)?.getScore(record.id);
+  const xScore = world.scoreboard.getObjective(LOCATION_OBJECTIVES.x)?.getScore(entity);
   if (xScore !== undefined) {
     const x = fromScore(xScore);
     if (!almostEqual(x, next.x)) {
@@ -152,7 +127,7 @@ export function readRecordFromScores(record: FmbeRecord): { changed: boolean; re
     }
   }
 
-  const yScore = world.scoreboard.getObjective(LOCATION_OBJECTIVES.y)?.getScore(record.id);
+  const yScore = world.scoreboard.getObjective(LOCATION_OBJECTIVES.y)?.getScore(entity);
   if (yScore !== undefined) {
     const y = fromScore(yScore);
     if (!almostEqual(y, next.y)) {
@@ -161,7 +136,7 @@ export function readRecordFromScores(record: FmbeRecord): { changed: boolean; re
     }
   }
 
-  const zScore = world.scoreboard.getObjective(LOCATION_OBJECTIVES.z)?.getScore(record.id);
+  const zScore = world.scoreboard.getObjective(LOCATION_OBJECTIVES.z)?.getScore(entity);
   if (zScore !== undefined) {
     const z = fromScore(zScore);
     if (!almostEqual(z, next.z)) {
@@ -170,7 +145,7 @@ export function readRecordFromScores(record: FmbeRecord): { changed: boolean; re
     }
   }
 
-  const presetScore = world.scoreboard.getObjective(PRESET_OBJECTIVE)?.getScore(record.id);
+  const presetScore = world.scoreboard.getObjective(PRESET_OBJECTIVE)?.getScore(entity);
   if (presetScore !== undefined) {
     const preset = SCORE_TO_PRESET[presetScore];
     if (preset && preset !== next.preset) {
