@@ -44,17 +44,22 @@ function registerManagedCommand(
   command: CustomCommand,
   handler: (origin: CustomCommandOrigin, ...args: unknown[]) => void
 ): void {
-  registry.registerCommand(command, (origin, ...args) => {
-    system.run(() => {
-      try {
-        handler(origin, ...args);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        sendToOrigin(origin, `§c[FMBE] ${message}`);
-      }
+  try {
+    registry.registerCommand(command, (origin, ...args) => {
+      system.run(() => {
+        try {
+          handler(origin, ...args);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          sendToOrigin(origin, `§c[FMBE] ${message}`);
+        }
+      });
+      return { status: CustomCommandStatus.Success };
     });
-    return { status: CustomCommandStatus.Success };
-  });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    world.sendMessage(`§c[FMBE] command register failed: ${command.name} (${message})`);
+  }
 }
 
 function commandBase(name: string, description: string): CustomCommand {
@@ -89,40 +94,10 @@ export function registerCommands(): void {
           { type: CustomCommandParamType.Float, name: "xOffset" },
           { type: CustomCommandParamType.Float, name: "yOffset" },
           { type: CustomCommandParamType.Float, name: "zOffset" },
-          { type: CustomCommandParamType.Float, name: "xRot" },
-          { type: CustomCommandParamType.Float, name: "yRot" },
-          { type: CustomCommandParamType.Float, name: "zRot" },
           { type: CustomCommandParamType.Float, name: "scale" },
-          { type: CustomCommandParamType.Float, name: "extendScale" },
-          { type: CustomCommandParamType.Float, name: "extendXrot" },
-          { type: CustomCommandParamType.Float, name: "extendYrot" },
-          { type: CustomCommandParamType.Float, name: "extendZrot" },
-          { type: CustomCommandParamType.Float, name: "xBasePos" },
-          { type: CustomCommandParamType.Float, name: "yBasePos" },
-          { type: CustomCommandParamType.Float, name: "zBasePos" },
         ],
       },
-      (
-        origin,
-        id,
-        block,
-        preset,
-        location,
-        xOffset,
-        yOffset,
-        zOffset,
-        xRot,
-        yRot,
-        zRot,
-        scale,
-        extendScale,
-        extendXrot,
-        extendYrot,
-        extendZrot,
-        xBasePos,
-        yBasePos,
-        zBasePos
-      ) => {
+      (origin, id, block, preset, location, xOffset, yOffset, zOffset, scale) => {
         const fmbeId = String(id ?? "");
         if (!isNamespacedId(fmbeId)) throw new Error("id must be namespaced. e.g. fmbe:sample");
         if (getRecordById(fmbeId)) throw new Error(`id already exists: ${fmbeId}`);
@@ -139,17 +114,7 @@ export function registerCommands(): void {
           xOffset,
           yOffset,
           zOffset,
-          xRot,
-          yRot,
-          zRot,
           scale,
-          extendScale,
-          extendXrot,
-          extendYrot,
-          extendZrot,
-          xBasePos,
-          yBasePos,
-          zBasePos,
         });
 
         const record: FmbeRecord = {
@@ -184,39 +149,10 @@ export function registerCommands(): void {
           { type: CustomCommandParamType.Float, name: "xOffset" },
           { type: CustomCommandParamType.Float, name: "yOffset" },
           { type: CustomCommandParamType.Float, name: "zOffset" },
-          { type: CustomCommandParamType.Float, name: "xRot" },
-          { type: CustomCommandParamType.Float, name: "yRot" },
-          { type: CustomCommandParamType.Float, name: "zRot" },
           { type: CustomCommandParamType.Float, name: "scale" },
-          { type: CustomCommandParamType.Float, name: "extendScale" },
-          { type: CustomCommandParamType.Float, name: "extendXrot" },
-          { type: CustomCommandParamType.Float, name: "extendYrot" },
-          { type: CustomCommandParamType.Float, name: "extendZrot" },
-          { type: CustomCommandParamType.Float, name: "xBasePos" },
-          { type: CustomCommandParamType.Float, name: "yBasePos" },
-          { type: CustomCommandParamType.Float, name: "zBasePos" },
         ],
       },
-      (
-        origin,
-        id,
-        item,
-        location,
-        xOffset,
-        yOffset,
-        zOffset,
-        xRot,
-        yRot,
-        zRot,
-        scale,
-        extendScale,
-        extendXrot,
-        extendYrot,
-        extendZrot,
-        xBasePos,
-        yBasePos,
-        zBasePos
-      ) => {
+      (origin, id, item, location, xOffset, yOffset, zOffset, scale) => {
         const fmbeId = String(id ?? "");
         if (!isNamespacedId(fmbeId)) throw new Error("id must be namespaced. e.g. fmbe:sample");
         if (getRecordById(fmbeId)) throw new Error(`id already exists: ${fmbeId}`);
@@ -229,17 +165,7 @@ export function registerCommands(): void {
           xOffset,
           yOffset,
           zOffset,
-          xRot,
-          yRot,
-          zRot,
           scale,
-          extendScale,
-          extendXrot,
-          extendYrot,
-          extendZrot,
-          xBasePos,
-          yBasePos,
-          zBasePos,
         });
 
         const spawnLocation = location as Vector3;

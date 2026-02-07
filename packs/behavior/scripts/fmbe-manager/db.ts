@@ -1,10 +1,45 @@
+import { world } from "@minecraft/server";
 import { MinecraftDimensionTypes } from "@minecraft/vanilla-data";
-import { WorldSqlDatabase } from "../lib/MCBEDatabase/lib/database.ts";
 import { now, parseTransformJson } from "./helpers.ts";
 import { removeRecordScores, syncRecordScores } from "./scoreboard.ts";
 import { type FmbeRecord } from "./types.ts";
 
-const DB = new WorldSqlDatabase({ prefix: "fmbe:db:main", autoload: true });
+const STORE_KEY = "fmbe:records";
+
+let records = new Map<string, FmbeRecord>();
+let loaded = false;
+
+function ensureLoaded(): void {
+  if (loaded) return;
+
+  const raw = world.getDynamicProperty(STORE_KEY);
+  if (typeof raw !== "string" || raw.length === 0) {
+    records = new Map<string, FmbeRecord>();
+    loaded = true;
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>;
+    records = new Map<string, FmbeRecord>();
+    for (const [id, value] of Object.entries(parsed)) {
+      const row = toRecord({ ...value, id });
+      records.set(id, row);
+    }
+  } catch {
+    records = new Map<string, FmbeRecord>();
+  }
+
+  loaded = true;
+}
+
+function save(): void {
+  const snapshot: Record<string, FmbeRecord> = {};
+  for (const [id, record] of records) {
+    snapshot[id] = record;
+  }
+  world.setDynamicProperty(STORE_KEY, JSON.stringify(snapshot));
+}
 
 function toRecord(row: Record<string, unknown>): FmbeRecord {
   return {
@@ -22,55 +57,32 @@ function toRecord(row: Record<string, unknown>): FmbeRecord {
 }
 
 export function ensureSchema(): void {
-  DB.exec(
-    "CREATE TABLE IF NOT EXISTS fmbe_entities (" +
-      "id TEXT PRIMARY KEY, " +
-      "preset TEXT NOT NULL, " +
-      "blockTypeId TEXT, " +
-      "itemTypeId TEXT, " +
-      "dimensionId TEXT NOT NULL, " +
-      "x REAL NOT NULL, " +
-      "y REAL NOT NULL, " +
-      "z REAL NOT NULL, " +
-      "transformJson TEXT NOT NULL, " +
-      "updatedAt INTEGER NOT NULL" +
-      ")"
-  );
+  ensureLoaded();
 }
 
 export function upsertRecord(record: FmbeRecord): void {
-  DB.exec(
-    "INSERT OR REPLACE INTO fmbe_entities " +
-      "(id, preset, blockTypeId, itemTypeId, dimensionId, x, y, z, transformJson, updatedAt) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [
-      record.id,
-      record.preset,
-      record.blockTypeId,
-      record.itemTypeId,
-      record.dimensionId,
-      record.x,
-      record.y,
-      record.z,
-      JSON.stringify(record.transform),
-      record.updatedAt,
-    ]
-  );
+  ensureLoaded();
+  records.set(record.id, { ...record });
+  save();
   syncRecordScores(record);
 }
 
 export function getRecordById(id: string): FmbeRecord | undefined {
-  const rows = DB.query("SELECT * FROM fmbe_entities WHERE id = ?", [id]);
-  if (rows.length === 0) return undefined;
-  return toRecord(rows[0] as Record<string, unknown>);
+  ensureLoaded();
+  const row = records.get(id);
+  return row ? { ...row } : undefined;
 }
 
 export function getAllRecords(): FmbeRecord[] {
-  const rows = DB.query("SELECT * FROM fmbe_entities ORDER BY id ASC");
-  return rows.map((row) => toRecord(row as Record<string, unknown>));
+  ensureLoaded();
+  return [...records.values()]
+    .map((row) => ({ ...row }))
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
 export function removeRecordById(id: string): void {
-  DB.exec("DELETE FROM fmbe_entities WHERE id = ?", [id]);
+  ensureLoaded();
+  records.delete(id);
+  save();
   removeRecordScores(id);
 }

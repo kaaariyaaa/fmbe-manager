@@ -6,11 +6,19 @@ import { registerHitTracking } from "./events.ts";
 import { ADDON_NAME } from "./helpers.ts";
 import { registerRuntimeSync } from "./runtime.ts";
 
+let initialized = false;
+
 export function initializeFmbeManager(): void {
-  ensureSchema();
   registerCommands();
-  registerHitTracking();
-  registerRuntimeSync();
-  startAutoRenderLoop();
-  world.sendMessage(`[${ADDON_NAME}] Initialized`);
+
+  world.afterEvents.worldLoad.subscribe(() => {
+    if (initialized) return;
+    initialized = true;
+
+    ensureSchema();
+    registerHitTracking();
+    registerRuntimeSync();
+    startAutoRenderLoop();
+    world.sendMessage(`[${ADDON_NAME}] Initialized`);
+  });
 }

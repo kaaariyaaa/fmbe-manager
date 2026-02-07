@@ -1,0 +1,20 @@
+{
+  "name": "mcbedatabase",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "description": "Minecraft Bedrock Edition (Script API) SQL-like database library",
+  "dependencies": {
+    "@minecraft/server": "2.4.0",
+    "@minecraft/server-ui": "2.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build:lib": "tsc -p tsconfig.lib.json"
+  }
+}
