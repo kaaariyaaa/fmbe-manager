@@ -18,6 +18,23 @@ import {
 import { now } from "./helpers.ts";
 import { type FmbePreset, type FmbeRecord } from "./types.ts";
 
+function getMainhandTypeId(record: FmbeRecord): string | undefined {
+  if (record.preset === "item") {
+    return record.itemTypeId ?? record.blockTypeId ?? undefined;
+  }
+  return record.blockTypeId ?? record.itemTypeId ?? undefined;
+}
+
+function enforceMainhand(entity: Entity, record: FmbeRecord): void {
+  const typeId = getMainhandTypeId(record);
+  if (!typeId) return;
+  try {
+    entity.runCommand(`replaceitem entity @s slot.weapon.mainhand 0 ${typeId} 1`);
+  } catch {
+    // ignore invalid item/block ids for replaceitem
+  }
+}
+
 function presetToRenderType(preset: FmbePreset): FmbeRenderTypes {
   switch (preset) {
     case "item":
@@ -48,6 +65,8 @@ export function applyRecordToEntity(entity: Entity, record: FmbeRecord): void {
     type: presetToRenderType(record.preset),
     variables: transformToRenderVariables(record.transform),
   });
+
+  enforceMainhand(entity, record);
 }
 
 export function removeManagedEntity(entity: Entity): void {
