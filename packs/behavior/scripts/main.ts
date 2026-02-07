@@ -1,10 +1,3 @@
-import { world, system } from "@minecraft/server";
-const addonName = "fmbe-manager";
-let init = false;
+import { initializeFmbeManager } from "./fmbe-manager/index.ts";
 
-system.runInterval(() => {
-  if (!init) {
-    world.sendMessage(`[${addonName}] Initialized`);
-    init = true;
-  }
-});
+initializeFmbeManager();
