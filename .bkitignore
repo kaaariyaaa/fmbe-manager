@@ -1,0 +1,13 @@
+# Build output
+dist/
+# Dependencies
+node_modules/
+# VCS / editor
+.git/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+# Logs / temp
+*.log
+*.tmp

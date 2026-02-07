@@ -1,0 +1,27 @@
+{
+  "name": "fmbe-manager",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "BedrockKit addon project",
+  "dependencies": {
+    "@minecraft/server": "2.5.0-beta.1.21.132-stable",
+    "@minecraft/server-ui": "2.0.0",
+    "@minecraft/vanilla-data": "1.21.93"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "eslint": "^9.14.0",
+    "@typescript-eslint/parser": "^8.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.13.0",
+    "eslint-plugin-minecraft-linting": "^1.0.0",
+    "esbuild": "^0.24.0",
+    "@minecraft/core-build-tasks": "^1.1.6"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"packs/behavior/scripts/**/*.{ts,js}\"",
+    "build:local": "node ./tools/local-build.mjs",
+    "package:local": "node ./tools/local-package.mjs"
+  }
+}

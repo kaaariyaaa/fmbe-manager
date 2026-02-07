@@ -1,0 +1,53 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "fmbe-manager (behavior)",
+    "description": "fmbe-manager behavior pack",
+    "uuid": "fba4768d-640d-48f0-b782-63a0c79854b4",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      21,
+      2
+    ]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "d4921e9c-ba93-4980-a5c5-973e43e037a1",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "type": "script",
+      "language": "javascript",
+      "entry": "scripts/main.js",
+      "uuid": "f8287d60-1e9f-4060-b4cf-3eac302b754e",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "module_name": "@minecraft/server",
+      "version": "2.5.0-beta"
+    },
+    {
+      "module_name": "@minecraft/server-ui",
+      "version": "2.0.0"
+    }
+  ],
+  "metadata": {
+    "product_type": "addon"
+  }
+}

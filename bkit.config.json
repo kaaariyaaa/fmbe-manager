@@ -1,0 +1,50 @@
+{
+  "project": {
+    "name": "fmbe-manager",
+    "version": "1.0.0"
+  },
+  "template": "official-sample",
+  "packSelection": {
+    "behavior": true,
+    "resource": false
+  },
+  "packs": {
+    "behavior": "packs/behavior",
+    "resource": "packs/resource"
+  },
+  "build": {
+    "outDir": "dist",
+    "target": "dev"
+  },
+  "sync": {
+    "defaultTarget": "gdk",
+    "targets": {
+      "gdk": {
+        "product": "BedrockGDK",
+        "projectName": "fmbe-manager"
+      }
+    }
+  },
+  "paths": {
+    "root": "D:\\Projects\\MCBE\\addon\\fmbe-manager"
+  },
+  "script": {
+    "entry": "scripts/main.ts",
+    "language": "typescript",
+    "dependencies": [
+      {
+        "module_name": "@minecraft/server",
+        "version": "2.5.0-beta"
+      },
+      {
+        "module_name": "@minecraft/server-ui",
+        "version": "2.0.0"
+      },
+      {
+        "module_name": "@minecraft/vanilla-data",
+        "version": "1.21.93"
+      }
+    ],
+    "apiVersion": "1.11.0"
+  }
+}
