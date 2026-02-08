@@ -20,6 +20,7 @@ import { type FmbePreset, type FmbeRecord } from "./types.ts";
 import { removeEntityScores, syncEntityScores } from "./scoreboard.ts";
 
 const ID_TAG_PREFIX = "fmbe:";
+const MANAGED_TAG = "fmbe";
 
 function sanitizeIdForTag(id: string): string {
   return id.replace(/[^a-zA-Z0-9_:\-./]/g, "_");
@@ -37,6 +38,11 @@ function syncIdTag(entity: Entity, id: string): void {
     entity.removeTag(tag);
   }
   entity.addTag(expected);
+}
+
+function ensureManagedTag(entity: Entity): void {
+  if (entity.getTags().includes(MANAGED_TAG)) return;
+  entity.addTag(MANAGED_TAG);
 }
 
 function getMainhandTypeId(record: FmbeRecord): string | undefined {
@@ -69,6 +75,7 @@ function presetToRenderType(preset: FmbePreset): FmbeRenderTypes {
 
 export function isManagedEntity(entity: Entity): boolean {
   if (entity.typeId !== MinecraftEntityTypes.Fox) return false;
+  if (!entity.getTags().includes(MANAGED_TAG)) return false;
   const managed = entity.getDynamicProperty(DP_MANAGED);
   const fmbeId = entity.getDynamicProperty(DP_ID);
   return managed === true && typeof fmbeId === "string" && fmbeId.length > 0;
@@ -81,6 +88,7 @@ export function applyRecordToEntity(entity: Entity, record: FmbeRecord): void {
   entity.setDynamicProperty(DP_BLOCK, record.blockTypeId ?? undefined);
   entity.setDynamicProperty(DP_ITEM, record.itemTypeId ?? undefined);
   entity.setDynamicProperty(DP_EXTEND_ZROT, record.transform.extendZrot ?? undefined);
+  ensureManagedTag(entity);
   syncIdTag(entity, record.id);
   syncEntityScores(entity, record);
 
@@ -94,6 +102,7 @@ export function applyRecordToEntity(entity: Entity, record: FmbeRecord): void {
 
 export function removeManagedEntity(entity: Entity): void {
   removeEntityScores(entity);
+  entity.removeTag(MANAGED_TAG);
   for (const tag of entity.getTags()) {
     if (tag.startsWith(ID_TAG_PREFIX)) entity.removeTag(tag);
   }
