@@ -20,7 +20,7 @@ Minecraft Bedrock ScriptAPI で FMBE (Fox Model Block Entity) を管理するア
 ### 1) Clone（推奨）
 
 ```bash
-git clone --recurse-submodules <repo-url>
+git clone --recurse-submodules https://github.com/kaaariyaaa/fmbe-manager.git
 cd fmbe-manager
 ```
 

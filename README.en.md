@@ -20,7 +20,7 @@ This repository uses git submodules (for example: `packs/behavior/scripts/lib/fm
 ### 1) Clone (recommended)
 
 ```bash
-git clone --recurse-submodules <repo-url>
+git clone --recurse-submodules https://github.com/kaaariyaaa/fmbe-manager.git
 cd fmbe-manager
 ```
 
