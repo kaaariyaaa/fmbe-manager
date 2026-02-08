@@ -112,6 +112,24 @@ function validateGroupName(value: unknown): string {
   return groupName;
 }
 
+function asEntityArray(value: unknown): Entity[] {
+  if (!Array.isArray(value)) return [];
+  return value as Entity[];
+}
+
+function getManagedSelectedEntities(value: unknown): Entity[] {
+  const selected = asEntityArray(value);
+  const managed = selected.filter((entity) => isManagedEntity(entity));
+  if (managed.length === 0) throw new Error("entity selector matched no FMBE.");
+  return managed;
+}
+
+function getSingleManagedSelectedEntity(value: unknown, name: string): Entity {
+  const selected = getManagedSelectedEntities(value);
+  if (selected.length !== 1) throw new Error(`${name} must match exactly one FMBE.`);
+  return selected[0]!;
+}
+
 export function registerCommands(): void {
   system.beforeEvents.startup.subscribe((startup) => {
     const { customCommandRegistry: registry } = startup;
@@ -328,20 +346,27 @@ export function registerCommands(): void {
         ],
       },
       (origin, entity, toGroup) => {
-        const target = entity as Entity | undefined;
-        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
+        const targets = getManagedSelectedEntities(entity);
 
         const nextGroup = validateGroupName(toGroup);
         if (!hasGroup(nextGroup)) throw new Error(`group not found: ${nextGroup}`);
 
-        const row = getEntityRecordOrThrow(target);
-        const prevGroup = getGroupForRecord(row.id);
-        if (!prevGroup) throw new Error("entity is not in a group. use fmbe:group_set first.");
-        if (prevGroup === nextGroup) throw new Error("entity is already in that group.");
+        let moved = 0;
+        let skipped = 0;
+        for (const target of targets) {
+          const row = getEntityRecordOrThrow(target);
+          const prevGroup = getGroupForRecord(row.id);
+          if (!prevGroup || prevGroup === nextGroup) {
+            skipped++;
+            continue;
+          }
 
-        setRecordGroup(row.id, nextGroup);
-        applyRecordToEntity(target, row);
-        sendToOrigin(origin, `§a[FMBE] moved ${row.id}: ${prevGroup} -> ${nextGroup}`);
+          setRecordGroup(row.id, nextGroup);
+          applyRecordToEntity(target, row);
+          moved++;
+        }
+
+        sendToOrigin(origin, `§a[FMBE] group_move done moved=${moved} skipped=${skipped} to=${nextGroup}`);
       }
     );
 
@@ -377,15 +402,16 @@ export function registerCommands(): void {
       },
       (origin, group, entity) => {
         const groupName = validateGroupName(group);
-        const target = entity as Entity | undefined;
-        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
+        const targets = getManagedSelectedEntities(entity);
 
         if (!hasGroup(groupName)) throw new Error(`group not found: ${groupName}`);
 
-        const row = getEntityRecordOrThrow(target);
-        setRecordGroup(row.id, groupName);
-        applyRecordToEntity(target, row);
-        sendToOrigin(origin, `§a[FMBE] ${row.id} -> group ${groupName}`);
+        for (const target of targets) {
+          const row = getEntityRecordOrThrow(target);
+          setRecordGroup(row.id, groupName);
+          applyRecordToEntity(target, row);
+        }
+        sendToOrigin(origin, `§a[FMBE] group_set done group=${groupName} count=${targets.length}`);
       }
     );
 
@@ -396,16 +422,22 @@ export function registerCommands(): void {
         mandatoryParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
       },
       (origin, entity) => {
-        const target = entity as Entity | undefined;
-        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
+        const targets = getManagedSelectedEntities(entity);
+        let cleared = 0;
+        let skipped = 0;
+        for (const target of targets) {
+          const row = getEntityRecordOrThrow(target);
+          const prev = getGroupForRecord(row.id);
+          if (!prev) {
+            skipped++;
+            continue;
+          }
 
-        const row = getEntityRecordOrThrow(target);
-        const prev = getGroupForRecord(row.id);
-        if (!prev) throw new Error("entity is not in a group.");
-
-        clearRecordGroup(row.id);
-        applyRecordToEntity(target, row);
-        sendToOrigin(origin, `§a[FMBE] ${row.id} removed from group ${prev}`);
+          clearRecordGroup(row.id);
+          applyRecordToEntity(target, row);
+          cleared++;
+        }
+        sendToOrigin(origin, `§a[FMBE] group_clear done cleared=${cleared} skipped=${skipped}`);
       }
     );
 
@@ -419,15 +451,15 @@ export function registerCommands(): void {
         ],
       },
       (origin, preset, entity) => {
-        const target = entity as Entity | undefined;
-        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
-
-        const row = getEntityRecordOrThrow(target);
         const nextPreset = presetFromAnyEnum(String(preset));
-        const next: FmbeRecord = { ...row, preset: nextPreset, updatedAt: now() };
-        upsertRecord(next);
-        applyRecordToEntity(target, next);
-        sendToOrigin(origin, `§a[FMBE] preset updated: ${row.id} -> ${presetToDisplay(nextPreset)}`);
+        const targets = getManagedSelectedEntities(entity);
+        for (const target of targets) {
+          const row = getEntityRecordOrThrow(target);
+          const next: FmbeRecord = { ...row, preset: nextPreset, updatedAt: now() };
+          upsertRecord(next);
+          applyRecordToEntity(target, next);
+        }
+        sendToOrigin(origin, `§a[FMBE] set_preset done preset=${presetToDisplay(nextPreset)} count=${targets.length}`);
       }
     );
 
@@ -441,19 +473,20 @@ export function registerCommands(): void {
         ],
       },
       (origin, block, entity) => {
-        const target = entity as Entity | undefined;
-        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
-
-        const row = getEntityRecordOrThrow(target);
-        const next: FmbeRecord = {
-          ...row,
-          blockTypeId: (block as BlockType).id,
-          itemTypeId: row.preset === "item" ? row.itemTypeId : null,
-          updatedAt: now(),
-        };
-        upsertRecord(next);
-        applyRecordToEntity(target, next);
-        sendToOrigin(origin, `§a[FMBE] block updated: ${row.id} -> ${next.blockTypeId}`);
+        const targets = getManagedSelectedEntities(entity);
+        const blockTypeId = (block as BlockType).id;
+        for (const target of targets) {
+          const row = getEntityRecordOrThrow(target);
+          const next: FmbeRecord = {
+            ...row,
+            blockTypeId,
+            itemTypeId: row.preset === "item" ? row.itemTypeId : null,
+            updatedAt: now(),
+          };
+          upsertRecord(next);
+          applyRecordToEntity(target, next);
+        }
+        sendToOrigin(origin, `§a[FMBE] set_block done block=${blockTypeId} count=${targets.length}`);
       }
     );
 
@@ -467,19 +500,20 @@ export function registerCommands(): void {
         ],
       },
       (origin, item, entity) => {
-        const target = entity as Entity | undefined;
-        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
-
-        const row = getEntityRecordOrThrow(target);
-        const next: FmbeRecord = {
-          ...row,
-          itemTypeId: (item as ItemType).id,
-          blockTypeId: row.preset === "item" ? null : row.blockTypeId,
-          updatedAt: now(),
-        };
-        upsertRecord(next);
-        applyRecordToEntity(target, next);
-        sendToOrigin(origin, `§a[FMBE] item updated: ${row.id} -> ${next.itemTypeId}`);
+        const targets = getManagedSelectedEntities(entity);
+        const itemTypeId = (item as ItemType).id;
+        for (const target of targets) {
+          const row = getEntityRecordOrThrow(target);
+          const next: FmbeRecord = {
+            ...row,
+            itemTypeId,
+            blockTypeId: row.preset === "item" ? null : row.blockTypeId,
+            updatedAt: now(),
+          };
+          upsertRecord(next);
+          applyRecordToEntity(target, next);
+        }
+        sendToOrigin(origin, `§a[FMBE] set_item done item=${itemTypeId} count=${targets.length}`);
       }
     );
 
@@ -493,22 +527,22 @@ export function registerCommands(): void {
         ],
       },
       (origin, location, entity) => {
-        const target = entity as Entity | undefined;
-        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
-
-        const row = getEntityRecordOrThrow(target);
         const pos = location as Vector3;
-        target.teleport(pos);
-        const next: FmbeRecord = {
-          ...row,
-          dimensionId: target.dimension.id,
-          x: pos.x,
-          y: pos.y,
-          z: pos.z,
-          updatedAt: now(),
-        };
-        upsertRecord(next);
-        sendToOrigin(origin, `§a[FMBE] moved: ${row.id}`);
+        const targets = getManagedSelectedEntities(entity);
+        for (const target of targets) {
+          const row = getEntityRecordOrThrow(target);
+          target.teleport(pos);
+          const next: FmbeRecord = {
+            ...row,
+            dimensionId: target.dimension.id,
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+            updatedAt: now(),
+          };
+          upsertRecord(next);
+        }
+        sendToOrigin(origin, `§a[FMBE] set_location done count=${targets.length}`);
       }
     );
 
@@ -523,28 +557,29 @@ export function registerCommands(): void {
         ],
       },
       (origin, fromEntity, toEntity, location) => {
-        const from = fromEntity as Entity | undefined;
-        if (!from || !isManagedEntity(from)) throw new Error("fromEntity must be an FMBE.");
+        const from = getSingleManagedSelectedEntity(fromEntity, "fromEntity");
         const fromRow = getEntityRecordOrThrow(from);
 
-        const target = toEntity as Entity | undefined;
+        const toTargets = asEntityArray(toEntity).filter((entity) => isManagedEntity(entity));
         const specifiedLoc = location as Vector3 | undefined;
 
-        if (target && isManagedEntity(target)) {
-          const toRow = getEntityRecordOrThrow(target);
-          const next: FmbeRecord = {
-            ...fromRow,
-            id: toRow.id,
-            dimensionId: specifiedLoc ? target.dimension.id : toRow.dimensionId,
-            x: specifiedLoc ? specifiedLoc.x : toRow.x,
-            y: specifiedLoc ? specifiedLoc.y : toRow.y,
-            z: specifiedLoc ? specifiedLoc.z : toRow.z,
-            updatedAt: now(),
-          };
-          if (specifiedLoc) target.teleport(specifiedLoc);
-          upsertRecord(next);
-          applyRecordToEntity(target, next);
-          sendToOrigin(origin, `§a[FMBE] cloned to existing entity: ${next.id}`);
+        if (toTargets.length > 0) {
+          for (const target of toTargets) {
+            const toRow = getEntityRecordOrThrow(target);
+            const next: FmbeRecord = {
+              ...fromRow,
+              id: toRow.id,
+              dimensionId: specifiedLoc ? target.dimension.id : toRow.dimensionId,
+              x: specifiedLoc ? specifiedLoc.x : toRow.x,
+              y: specifiedLoc ? specifiedLoc.y : toRow.y,
+              z: specifiedLoc ? specifiedLoc.z : toRow.z,
+              updatedAt: now(),
+            };
+            if (specifiedLoc) target.teleport(specifiedLoc);
+            upsertRecord(next);
+            applyRecordToEntity(target, next);
+          }
+          sendToOrigin(origin, `§a[FMBE] clone applied to existing entities count=${toTargets.length}`);
           return;
         }
 
@@ -575,14 +610,14 @@ export function registerCommands(): void {
         mandatoryParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
       },
       (origin, entity) => {
-        const target = entity as Entity | undefined;
-        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
-
-        const row = getEntityRecordOrThrow(target);
-        removeRecordFromGroups(row.id);
-        removeRecordById(row.id);
-        removeManagedEntity(target);
-        sendToOrigin(origin, `§a[FMBE] removed: ${row.id}`);
+        const targets = getManagedSelectedEntities(entity);
+        for (const target of targets) {
+          const row = getEntityRecordOrThrow(target);
+          removeRecordFromGroups(row.id);
+          removeRecordById(row.id);
+          removeManagedEntity(target);
+        }
+        sendToOrigin(origin, `§a[FMBE] remove done count=${targets.length}`);
       }
     );
 
@@ -595,14 +630,15 @@ export function registerCommands(): void {
       },
       (origin, content, entity) => {
         const mode = String(content) as FmbeDataMode;
-        const scopeEntity = entity as Entity | undefined;
+        const scopeEntities = asEntityArray(entity).filter((value) => isManagedEntity(value));
 
         if (mode === "info") {
-          if (scopeEntity) {
-            if (!isManagedEntity(scopeEntity)) throw new Error("entity must be an FMBE.");
-            const row = getEntityRecordOrThrow(scopeEntity);
-            sendToOrigin(origin, `§b[FMBE] ${formatRecord(row)}`);
-            sendToOrigin(origin, `§7transform=${JSON.stringify(row.transform)}`);
+          if (scopeEntities.length > 0) {
+            for (const target of scopeEntities) {
+              const row = getEntityRecordOrThrow(target);
+              sendToOrigin(origin, `§b[FMBE] ${formatRecord(row)}`);
+              sendToOrigin(origin, `§7transform=${JSON.stringify(row.transform)}`);
+            }
             return;
           }
 
@@ -613,19 +649,18 @@ export function registerCommands(): void {
           return;
         }
 
-        const scopedId = scopeEntity?.getDynamicProperty(DP_ID);
-        const targetId = typeof scopedId === "string" ? scopedId : undefined;
+        const targetIds = scopeEntities
+          .map((selected) => selected.getDynamicProperty(DP_ID))
+          .filter((value): value is string => typeof value === "string");
+        const targetIdSet = new Set(targetIds);
 
-        const dbRecords = targetId
-          ? (() => {
-              const row = getRecordById(targetId);
-              return row ? [row] : [];
-            })()
+        const dbRecords = targetIdSet.size > 0
+          ? getAllRecords().filter((row) => targetIdSet.has(row.id))
           : getAllRecords();
         const dbMap = new Map<string, FmbeRecord>();
         for (const row of dbRecords) dbMap.set(row.id, row);
 
-        const entities = scopeEntity ? (isManagedEntity(scopeEntity) ? [scopeEntity] : []) : getAllManagedEntities();
+        const entities = targetIdSet.size > 0 ? scopeEntities : getAllManagedEntities();
         const entityMap = new Map<string, Entity>();
         for (const ent of entities) {
           const entityId = ent.getDynamicProperty(DP_ID);
