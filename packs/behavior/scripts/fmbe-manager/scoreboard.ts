@@ -60,6 +60,13 @@ const GROUP_OPERATION_OBJECTIVES = {
   value: "fmbe:group:OpValue",
 } as const;
 
+export function ensureGroupOperationObjectives(): void {
+  getObjective(GROUP_OPERATION_OBJECTIVES.seq);
+  getObjective(GROUP_OPERATION_OBJECTIVES.target);
+  getObjective(GROUP_OPERATION_OBJECTIVES.type);
+  getObjective(GROUP_OPERATION_OBJECTIVES.value);
+}
+
 const GROUP_TARGET_MAP = {
   1: "xOffset",
   2: "yOffset",
@@ -164,7 +171,7 @@ export function syncEntityScores(entity: Entity, record: FmbeRecord): void {
 export function removeEntityScores(entity: Entity): void {
   const allObjectives = [...Object.values(SCORE_OBJECTIVES), LOCATION_OBJECTIVES.x, LOCATION_OBJECTIVES.y, LOCATION_OBJECTIVES.z, PRESET_OBJECTIVE];
   for (const objectiveId of allObjectives) {
-    const objective = world.scoreboard.getObjective(objectiveId);
+    const objective = getObjective(objectiveId);
     if (!objective) continue;
     objective.removeParticipant(entity);
   }
@@ -178,7 +185,7 @@ export function readRecordFromEntityScores(entity: Entity, record: FmbeRecord): 
   let changed = false;
 
   for (const [key, objectiveId] of Object.entries(SCORE_OBJECTIVES) as Array<[keyof StoredTransform, string]>) {
-    const objective = world.scoreboard.getObjective(objectiveId);
+    const objective = getObjective(objectiveId);
     if (!objective) continue;
     const score = objective.getScore(entity);
     if (score === undefined) continue;
@@ -191,7 +198,7 @@ export function readRecordFromEntityScores(entity: Entity, record: FmbeRecord): 
     changed = true;
   }
 
-  const xScore = world.scoreboard.getObjective(LOCATION_OBJECTIVES.x)?.getScore(entity);
+  const xScore = getObjective(LOCATION_OBJECTIVES.x)?.getScore(entity);
   if (xScore !== undefined) {
     const x = fromScore(xScore);
     if (!almostEqual(x, next.x)) {
@@ -200,7 +207,7 @@ export function readRecordFromEntityScores(entity: Entity, record: FmbeRecord): 
     }
   }
 
-  const yScore = world.scoreboard.getObjective(LOCATION_OBJECTIVES.y)?.getScore(entity);
+  const yScore = getObjective(LOCATION_OBJECTIVES.y)?.getScore(entity);
   if (yScore !== undefined) {
     const y = fromScore(yScore);
     if (!almostEqual(y, next.y)) {
@@ -209,7 +216,7 @@ export function readRecordFromEntityScores(entity: Entity, record: FmbeRecord): 
     }
   }
 
-  const zScore = world.scoreboard.getObjective(LOCATION_OBJECTIVES.z)?.getScore(entity);
+  const zScore = getObjective(LOCATION_OBJECTIVES.z)?.getScore(entity);
   if (zScore !== undefined) {
     const z = fromScore(zScore);
     if (!almostEqual(z, next.z)) {
@@ -218,7 +225,7 @@ export function readRecordFromEntityScores(entity: Entity, record: FmbeRecord): 
     }
   }
 
-  const presetScore = world.scoreboard.getObjective(PRESET_OBJECTIVE)?.getScore(entity);
+  const presetScore = getObjective(PRESET_OBJECTIVE)?.getScore(entity);
   if (presetScore !== undefined) {
     const preset = SCORE_TO_PRESET[presetScore];
     if (preset && preset !== next.preset) {
@@ -254,7 +261,7 @@ export function removeGroupScores(groupName: string): void {
   ];
 
   for (const objectiveId of objectives) {
-    const objective = world.scoreboard.getObjective(objectiveId);
+    const objective = getObjective(objectiveId);
     if (!objective) continue;
     objective.removeParticipant(participant);
   }
@@ -270,7 +277,7 @@ export function readGroupScores(groupName: string, fallback: FmbeRecord): { chan
   let changed = false;
 
   for (const [key, objectiveId] of Object.entries(GROUP_SCORE_OBJECTIVES) as Array<[keyof StoredTransform, string]>) {
-    const objective = world.scoreboard.getObjective(objectiveId);
+    const objective = getObjective(objectiveId);
     if (!objective) continue;
 
     const score = objective.getScore(participant);
@@ -284,7 +291,7 @@ export function readGroupScores(groupName: string, fallback: FmbeRecord): { chan
     changed = true;
   }
 
-  const xScore = world.scoreboard.getObjective(GROUP_LOCATION_OBJECTIVES.x)?.getScore(participant);
+  const xScore = getObjective(GROUP_LOCATION_OBJECTIVES.x)?.getScore(participant);
   if (xScore !== undefined) {
     const x = fromScore(xScore);
     if (!almostEqual(x, next.x)) {
@@ -293,7 +300,7 @@ export function readGroupScores(groupName: string, fallback: FmbeRecord): { chan
     }
   }
 
-  const yScore = world.scoreboard.getObjective(GROUP_LOCATION_OBJECTIVES.y)?.getScore(participant);
+  const yScore = getObjective(GROUP_LOCATION_OBJECTIVES.y)?.getScore(participant);
   if (yScore !== undefined) {
     const y = fromScore(yScore);
     if (!almostEqual(y, next.y)) {
@@ -302,7 +309,7 @@ export function readGroupScores(groupName: string, fallback: FmbeRecord): { chan
     }
   }
 
-  const zScore = world.scoreboard.getObjective(GROUP_LOCATION_OBJECTIVES.z)?.getScore(participant);
+  const zScore = getObjective(GROUP_LOCATION_OBJECTIVES.z)?.getScore(participant);
   if (zScore !== undefined) {
     const z = fromScore(zScore);
     if (!almostEqual(z, next.z)) {
@@ -311,7 +318,7 @@ export function readGroupScores(groupName: string, fallback: FmbeRecord): { chan
     }
   }
 
-  const presetScore = world.scoreboard.getObjective(GROUP_PRESET_OBJECTIVE)?.getScore(participant);
+  const presetScore = getObjective(GROUP_PRESET_OBJECTIVE)?.getScore(participant);
   if (presetScore !== undefined) {
     const preset = SCORE_TO_PRESET[presetScore];
     if (preset && preset !== next.preset) {
@@ -326,12 +333,12 @@ export function readGroupScores(groupName: string, fallback: FmbeRecord): { chan
 export function readGroupOperation(groupName: string): GroupOperation | undefined {
   const participant = getGroupParticipant(groupName);
 
-  const seq = world.scoreboard.getObjective(GROUP_OPERATION_OBJECTIVES.seq)?.getScore(participant);
+  const seq = getObjective(GROUP_OPERATION_OBJECTIVES.seq)?.getScore(participant);
   if (seq === undefined) return undefined;
 
-  const targetCode = world.scoreboard.getObjective(GROUP_OPERATION_OBJECTIVES.target)?.getScore(participant);
-  const typeCode = world.scoreboard.getObjective(GROUP_OPERATION_OBJECTIVES.type)?.getScore(participant);
-  const valueScore = world.scoreboard.getObjective(GROUP_OPERATION_OBJECTIVES.value)?.getScore(participant);
+  const targetCode = getObjective(GROUP_OPERATION_OBJECTIVES.target)?.getScore(participant);
+  const typeCode = getObjective(GROUP_OPERATION_OBJECTIVES.type)?.getScore(participant);
+  const valueScore = getObjective(GROUP_OPERATION_OBJECTIVES.value)?.getScore(participant);
   if (targetCode === undefined || typeCode === undefined || valueScore === undefined) return undefined;
 
   const target = GROUP_TARGET_MAP[targetCode as keyof typeof GROUP_TARGET_MAP];

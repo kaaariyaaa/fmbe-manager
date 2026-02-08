@@ -8,6 +8,7 @@ import {
   readRecordFromEntityScores,
   syncEntityScores,
   syncGroupScores,
+  ensureGroupOperationObjectives,
   type GroupOperation,
 } from "./scoreboard.ts";
 import { getGroupForRecord, getGroupMembers, listGroups, removeRecordFromGroups } from "./groups.ts";
@@ -186,6 +187,8 @@ function isSameLocation(a: { x: number; y: number; z: number }, b: { x: number; 
 }
 
 export function registerRuntimeSync(): void {
+  ensureGroupOperationObjectives();
+
   system.runInterval(() => {
     const entityMap = new Map<string, ReturnType<typeof getAllManagedEntities>[number]>();
     for (const entity of getAllManagedEntities()) {
