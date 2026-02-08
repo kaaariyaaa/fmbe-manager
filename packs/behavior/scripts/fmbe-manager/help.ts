@@ -1,8 +1,8 @@
 export const HELP_LANGUAGE_OPTIONS = ["English", "Japanese"] as const;
 
 export const HELP_COMMAND_OPTIONS = [
-  "new_block",
-  "new_item",
+  "create_block",
+  "create_item",
   "list",
   "set_preset",
   "set_block",
@@ -26,10 +26,10 @@ type HelpLanguage = (typeof HELP_LANGUAGE_OPTIONS)[number];
 
 function getEnglishHelpLines(command: string): string[] {
   switch (command) {
-    case "new_block":
-      return ["/fmbe:new_block block:<BlockType> preset:<2D|3D> ?location ?xOffset ?yOffset ?zOffset ?scale"];
-    case "new_item":
-      return ["/fmbe:new_item item:<ItemType> ?location ?xOffset ?yOffset ?zOffset ?scale"];
+    case "create_block":
+      return ["/fmbe:create_block block:<BlockType> preset:<2D|3D> ?location ?xOffset ?yOffset ?zOffset ?scale"];
+    case "create_item":
+      return ["/fmbe:create_item item:<ItemType> ?location ?xOffset ?yOffset ?zOffset ?scale"];
     case "list":
       return ["/fmbe:list ?preset:<Item|2D|3D>"];
     case "set_preset":
@@ -90,10 +90,10 @@ function getEnglishHelpLines(command: string): string[] {
 
 function getJapaneseHelpLines(command: string): string[] {
   switch (command) {
-    case "new_block":
-      return ["/fmbe:new_block block:<BlockType> preset:<2D|3D> ?location ?xOffset ?yOffset ?zOffset ?scale", "FMBEブロックを新規作成します"];
-    case "new_item":
-      return ["/fmbe:new_item item:<ItemType> ?location ?xOffset ?yOffset ?zOffset ?scale", "FMBEアイテムを新規作成します"];
+    case "create_block":
+      return ["/fmbe:create_block block:<BlockType> preset:<2D|3D> ?location ?xOffset ?yOffset ?zOffset ?scale", "FMBEブロックを作成します"];
+    case "create_item":
+      return ["/fmbe:create_item item:<ItemType> ?location ?xOffset ?yOffset ?zOffset ?scale", "FMBEアイテムを作成します"];
     case "list":
       return ["/fmbe:list ?preset:<Item|2D|3D>", "FMBE一覧を表示します"];
     case "set_preset":

@@ -116,7 +116,7 @@ export function registerCommands(): void {
   system.beforeEvents.startup.subscribe((startup) => {
     const { customCommandRegistry: registry } = startup;
 
-    registry.registerEnum("fmbe:new_block_preset", ["2D", "3D"]);
+    registry.registerEnum("fmbe:create_block_preset", ["2D", "3D"]);
     registry.registerEnum("fmbe:list_preset", ["Item", "2D", "3D"]);
     registry.registerEnum("fmbe:set_preset", ["Item", "2D", "3D"]);
     registry.registerEnum("fmbe:data_content", ["cleanup", "fix", "validate", "info"]);
@@ -145,10 +145,10 @@ export function registerCommands(): void {
     registerManagedCommand(
       registry,
       {
-        ...commandBase("fmbe:new_block", "Create a new FMBE block"),
+        ...commandBase("fmbe:create_block", "Create FMBE block"),
         mandatoryParameters: [
           { type: CustomCommandParamType.BlockType, name: "block" },
-          { type: CustomCommandParamType.Enum, name: "preset", enumName: "fmbe:new_block_preset" },
+          { type: CustomCommandParamType.Enum, name: "preset", enumName: "fmbe:create_block_preset" },
         ],
         optionalParameters: [
           { type: CustomCommandParamType.Location, name: "location" },
@@ -183,14 +183,14 @@ export function registerCommands(): void {
 
         const entity = spawnFromRecord(record);
         upsertRecord(record);
-        sendToOrigin(origin, `§a[FMBE] created block ${fmbeId} (${presetToDisplay(record.preset)}) runtimeId=${entity.id}`);
+        sendToOrigin(origin, `§a[FMBE] block created: ${fmbeId} (${presetToDisplay(record.preset)}) runtimeId=${entity.id}`);
       }
     );
 
     registerManagedCommand(
       registry,
       {
-        ...commandBase("fmbe:new_item", "Create a new FMBE item"),
+        ...commandBase("fmbe:create_item", "Create FMBE item"),
         mandatoryParameters: [
           { type: CustomCommandParamType.ItemType, name: "item" },
         ],
@@ -225,7 +225,7 @@ export function registerCommands(): void {
 
         const entity = spawnFromRecord(record);
         upsertRecord(record);
-        sendToOrigin(origin, `§a[FMBE] created item ${fmbeId} runtimeId=${entity.id}`);
+        sendToOrigin(origin, `§a[FMBE] item created: ${fmbeId} runtimeId=${entity.id}`);
       }
     );
 
