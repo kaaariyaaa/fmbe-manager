@@ -18,10 +18,10 @@ export function registerHitTracking(): void {
     if (typeof fmbeId !== "string") return;
     const row = getRecordById(fmbeId);
     if (!row) {
-      player.sendMessage(`§c[FMBE] no DB row for ${fmbeId}`);
+      player.sendMessage(`§8[§bFMBE§8]§r §cno DB row for ${fmbeId}`);
       return;
     }
-    player.sendMessage(`§b[FMBE] ${formatRecord(row)}`);
-    player.sendMessage(`§7transform=${JSON.stringify(row.transform)}`);
+    player.sendMessage(`§8[§bFMBE§8]§r §b${formatRecord(row)}`);
+    player.sendMessage(`§8[§bFMBE§8]§r §7transform=${JSON.stringify(row.transform)}`);
   });
 }

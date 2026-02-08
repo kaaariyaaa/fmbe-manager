@@ -72,7 +72,7 @@ function registerManagedCommand(
     const message = error instanceof Error ? error.message : String(error);
     system.run(() => {
       try {
-        world.sendMessage(`§c[FMBE] command register failed: ${command.name} (${message})`);
+        world.sendMessage(`§8[§bFMBE§8]§r §ccommand register failed: ${command.name} (${message})`);
       } catch {
         // ignore when world messaging is unavailable
       }
@@ -122,12 +122,6 @@ function getManagedSelectedEntities(value: unknown): Entity[] {
   const managed = selected.filter((entity) => isManagedEntity(entity));
   if (managed.length === 0) throw new Error("entity selector matched no FMBE.");
   return managed;
-}
-
-function getSingleManagedSelectedEntity(value: unknown, name: string): Entity {
-  const selected = getManagedSelectedEntities(value);
-  if (selected.length !== 1) throw new Error(`${name} must match exactly one FMBE.`);
-  return selected[0]!;
 }
 
 export function registerCommands(): void {
@@ -557,14 +551,20 @@ export function registerCommands(): void {
         ],
       },
       (origin, fromEntity, toEntity, location) => {
-        const from = getSingleManagedSelectedEntity(fromEntity, "fromEntity");
-        const fromRow = getEntityRecordOrThrow(from);
+        const fromTargets = getManagedSelectedEntities(fromEntity);
 
         const toTargets = asEntityArray(toEntity).filter((entity) => isManagedEntity(entity));
         const specifiedLoc = location as Vector3 | undefined;
 
         if (toTargets.length > 0) {
-          for (const target of toTargets) {
+          if (fromTargets.length !== 1 && fromTargets.length !== toTargets.length) {
+            throw new Error("clone with multiple fromEntity requires equal toEntity count (or single fromEntity).");
+          }
+
+          for (let index = 0; index < toTargets.length; index++) {
+            const target = toTargets[index]!;
+            const from = fromTargets.length === 1 ? fromTargets[0]! : fromTargets[index]!;
+            const fromRow = getEntityRecordOrThrow(from);
             const toRow = getEntityRecordOrThrow(target);
             const next: FmbeRecord = {
               ...fromRow,
@@ -583,23 +583,27 @@ export function registerCommands(): void {
           return;
         }
 
-        const cloneId = generateRecordId();
         const originPlayer = getOriginPlayer(origin);
-        const cloneBase: FmbeRecord = {
-          ...fromRow,
-          id: cloneId,
-          updatedAt: now(),
-        };
-        if (specifiedLoc) {
-          cloneBase.dimensionId = originPlayer?.dimension.id ?? cloneBase.dimensionId;
-          cloneBase.x = specifiedLoc.x;
-          cloneBase.y = specifiedLoc.y;
-          cloneBase.z = specifiedLoc.z;
-        }
 
-        upsertRecord(cloneBase);
-        const cloned = spawnFromRecord(cloneBase);
-        sendToOrigin(origin, `§a[FMBE] cloned new: ${cloneBase.id} runtimeId=${cloned.id}`);
+        for (const from of fromTargets) {
+          const fromRow = getEntityRecordOrThrow(from);
+          const cloneId = generateRecordId();
+          const cloneBase: FmbeRecord = {
+            ...fromRow,
+            id: cloneId,
+            updatedAt: now(),
+          };
+          if (specifiedLoc) {
+            cloneBase.dimensionId = originPlayer?.dimension.id ?? cloneBase.dimensionId;
+            cloneBase.x = specifiedLoc.x;
+            cloneBase.y = specifiedLoc.y;
+            cloneBase.z = specifiedLoc.z;
+          }
+
+          upsertRecord(cloneBase);
+          spawnFromRecord(cloneBase);
+        }
+        sendToOrigin(origin, `§a[FMBE] clone created new entities count=${fromTargets.length}`);
       }
     );
 
@@ -630,7 +634,12 @@ export function registerCommands(): void {
       },
       (origin, content, entity) => {
         const mode = String(content) as FmbeDataMode;
+        const selectorSpecified = entity !== undefined;
         const scopeEntities = asEntityArray(entity).filter((value) => isManagedEntity(value));
+
+        if (selectorSpecified && scopeEntities.length === 0 && mode !== "info") {
+          throw new Error("entity selector matched no FMBE.");
+        }
 
         if (mode === "info") {
           if (scopeEntities.length > 0) {

@@ -19,6 +19,6 @@ export function initializeFmbeManager(): void {
     registerHitTracking();
     registerRuntimeSync();
     startAutoRenderLoop();
-    world.sendMessage(`[${ADDON_NAME}] Initialized`);
+    world.sendMessage(`§8[§b${ADDON_NAME}§8]§r §aInitialized`);
   });
 }

@@ -149,10 +149,12 @@ export function getOriginPlayer(origin: CustomCommandOrigin): Player | undefined
 }
 
 export function sendToOrigin(origin: CustomCommandOrigin, message: string): void {
+  const prefix = "§8[§bFMBE§8]§r";
+  const normalized = message.replace(/^((§[0-9a-fk-or])*)\[FMBE\]\s*/i, "$1");
   const player = getOriginPlayer(origin);
   if (player) {
-    player.sendMessage(message);
+    player.sendMessage(`${prefix} ${normalized}`);
     return;
   }
-  world.sendMessage(`[${ADDON_NAME}] ${message}`);
+  world.sendMessage(`§8[§b${ADDON_NAME}§8]§r ${normalized}`);
 }
