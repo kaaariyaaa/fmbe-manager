@@ -119,7 +119,7 @@ export function registerCommands(): void {
     registry.registerEnum("fmbe:new_block_preset", ["2D", "3D"]);
     registry.registerEnum("fmbe:list_preset", ["Item", "2D", "3D"]);
     registry.registerEnum("fmbe:set_preset", ["Item", "2D", "3D"]);
-    registry.registerEnum("fmbe:data_content", ["cleanup", "fix", "validate"]);
+    registry.registerEnum("fmbe:data_content", ["cleanup", "fix", "validate", "info"]);
     registry.registerEnum("fmbe:help_language", [...HELP_LANGUAGE_OPTIONS]);
     registry.registerEnum("fmbe:help_command", [...HELP_COMMAND_OPTIONS]);
 
@@ -412,29 +412,6 @@ export function registerCommands(): void {
     registerManagedCommand(
       registry,
       {
-        ...commandBase("fmbe:get", "Get FMBE data"),
-        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
-      },
-      (origin, entity) => {
-        const selected = entity as Entity | undefined;
-        if (selected) {
-          if (!isManagedEntity(selected)) throw new Error("entity must be an FMBE.");
-          const row = getEntityRecordOrThrow(selected);
-          sendToOrigin(origin, `§b[FMBE] ${formatRecord(row)}`);
-          sendToOrigin(origin, `§7transform=${JSON.stringify(row.transform)}`);
-          return;
-        }
-
-        const player = getOriginPlayer(origin);
-        if (!player) throw new Error("entity omitted and no player context.");
-        addPendingGet(player.id);
-        sendToOrigin(origin, "§e[FMBE] hit an FMBE to inspect it.");
-      }
-    );
-
-    registerManagedCommand(
-      registry,
-      {
         ...commandBase("fmbe:set_preset", "Set preset"),
         mandatoryParameters: [
           { type: CustomCommandParamType.Enum, name: "preset", enumName: "fmbe:set_preset" },
@@ -619,6 +596,22 @@ export function registerCommands(): void {
       (origin, content, entity) => {
         const mode = String(content) as FmbeDataMode;
         const scopeEntity = entity as Entity | undefined;
+
+        if (mode === "info") {
+          if (scopeEntity) {
+            if (!isManagedEntity(scopeEntity)) throw new Error("entity must be an FMBE.");
+            const row = getEntityRecordOrThrow(scopeEntity);
+            sendToOrigin(origin, `§b[FMBE] ${formatRecord(row)}`);
+            sendToOrigin(origin, `§7transform=${JSON.stringify(row.transform)}`);
+            return;
+          }
+
+          const player = getOriginPlayer(origin);
+          if (!player) throw new Error("entity omitted and no player context.");
+          addPendingGet(player.id);
+          sendToOrigin(origin, "§e[FMBE] hit an FMBE to inspect it.");
+          return;
+        }
 
         const scopedId = scopeEntity?.getDynamicProperty(DP_ID);
         const targetId = typeof scopedId === "string" ? scopedId : undefined;

@@ -1,6 +1,6 @@
 export type FmbePreset = "item" | "block2d" | "block3d";
 export type FmbeListPreset = "Item" | "2D" | "3D";
-export type FmbeDataMode = "cleanup" | "fix" | "validate";
+export type FmbeDataMode = "cleanup" | "fix" | "validate" | "info";
 
 export interface StoredTransform {
   xOffset?: number;

@@ -4,7 +4,6 @@ export const HELP_COMMAND_OPTIONS = [
   "new_block",
   "new_item",
   "list",
-  "get",
   "set_preset",
   "set_block",
   "set_item",
@@ -33,11 +32,6 @@ function getEnglishHelpLines(command: string): string[] {
       return ["/fmbe:new_item item:<ItemType> ?location ?xOffset ?yOffset ?zOffset ?scale"];
     case "list":
       return ["/fmbe:list ?preset:<Item|2D|3D>"];
-    case "get":
-      return [
-        "/fmbe:get ?entity:<EntitySelector>",
-        "If entity is omitted, run get first then hit an FMBE to inspect.",
-      ];
     case "set_preset":
       return ["/fmbe:set_preset preset:<Item|2D|3D> entity:<EntitySelector>"];
     case "set_block":
@@ -51,7 +45,10 @@ function getEnglishHelpLines(command: string): string[] {
     case "remove":
       return ["/fmbe:remove entity:<EntitySelector>"];
     case "data":
-      return ["/fmbe:data content:<cleanup|fix|validate> ?entity:<EntitySelector>"];
+      return [
+        "/fmbe:data content:<cleanup|fix|validate|info> ?entity:<EntitySelector>",
+        "content:info works like old get. If entity is omitted, run then hit an FMBE.",
+      ];
     case "group_create":
       return ["/fmbe:group_create group:<String>"];
     case "group_delete":
@@ -99,12 +96,6 @@ function getJapaneseHelpLines(command: string): string[] {
       return ["/fmbe:new_item item:<ItemType> ?location ?xOffset ?yOffset ?zOffset ?scale", "FMBEアイテムを新規作成します"];
     case "list":
       return ["/fmbe:list ?preset:<Item|2D|3D>", "FMBE一覧を表示します"];
-    case "get":
-      return [
-        "/fmbe:get ?entity:<EntitySelector>",
-        "対象FMBEの情報を表示します",
-        "entity省略時はget実行後に最初に殴ったFMBEを表示します",
-      ];
     case "set_preset":
       return ["/fmbe:set_preset preset:<Item|2D|3D> entity:<EntitySelector>", "対象FMBEのPresetを変更します"];
     case "set_block":
@@ -118,7 +109,11 @@ function getJapaneseHelpLines(command: string): string[] {
     case "remove":
       return ["/fmbe:remove entity:<EntitySelector>", "対象FMBEを削除します"];
     case "data":
-      return ["/fmbe:data content:<cleanup|fix|validate> ?entity:<EntitySelector>", "データ整合性を処理します"];
+      return [
+        "/fmbe:data content:<cleanup|fix|validate|info> ?entity:<EntitySelector>",
+        "データ整合性を処理します",
+        "content=info は旧getと同じ挙動です（entity省略時は実行後に最初に殴ったFMBEを表示）",
+      ];
     case "group_create":
       return ["/fmbe:group_create group:<String>", "グループを作成します"];
     case "group_delete":
