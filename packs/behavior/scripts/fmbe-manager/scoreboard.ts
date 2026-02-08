@@ -1,5 +1,6 @@
 import { world, type Entity } from "@minecraft/server";
 import { type FmbeRecord, type StoredTransform } from "./types.ts";
+import { normalizeTransform } from "./helpers.ts";
 
 const SCALE = 1000;
 
@@ -234,6 +235,12 @@ export function readRecordFromEntityScores(entity: Entity, record: FmbeRecord): 
     }
   }
 
+  const normalized = normalizeTransform(next.transform);
+  if (JSON.stringify(normalized) !== JSON.stringify(next.transform)) {
+    next.transform = normalized;
+    changed = true;
+  }
+
   return { changed, record: next };
 }
 
@@ -325,6 +332,12 @@ export function readGroupScores(groupName: string, fallback: FmbeRecord): { chan
       next.preset = preset;
       changed = true;
     }
+  }
+
+  const normalized = normalizeTransform(next.transform);
+  if (JSON.stringify(normalized) !== JSON.stringify(next.transform)) {
+    next.transform = normalized;
+    changed = true;
   }
 
   return { changed, record: next };

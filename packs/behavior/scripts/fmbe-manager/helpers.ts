@@ -31,6 +31,57 @@ export function asNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
+function wrapSigned(value: number, limit: number): number {
+  if (value <= limit && value >= -limit) return value;
+  const width = limit * 2;
+  const shifted = value + limit;
+  const wrapped = ((shifted % width) + width) % width;
+  return wrapped - limit;
+}
+
+const VARIABLE_LIMITS = {
+  offset: 2048,
+  rotation: 360,
+  scaleMin: 0.05,
+  scaleMax: 16,
+  extendScaleMin: 0.05,
+  extendScaleMax: 16,
+  basePos: 2048,
+} as const;
+
+export function normalizeTransform(transform: StoredTransform): StoredTransform {
+  const next: StoredTransform = { ...transform };
+
+  if (next.xOffset !== undefined) next.xOffset = clamp(next.xOffset, -VARIABLE_LIMITS.offset, VARIABLE_LIMITS.offset);
+  if (next.yOffset !== undefined) next.yOffset = clamp(next.yOffset, -VARIABLE_LIMITS.offset, VARIABLE_LIMITS.offset);
+  if (next.zOffset !== undefined) next.zOffset = clamp(next.zOffset, -VARIABLE_LIMITS.offset, VARIABLE_LIMITS.offset);
+
+  if (next.xRot !== undefined) next.xRot = wrapSigned(next.xRot, VARIABLE_LIMITS.rotation);
+  if (next.yRot !== undefined) next.yRot = wrapSigned(next.yRot, VARIABLE_LIMITS.rotation);
+  if (next.zRot !== undefined) next.zRot = wrapSigned(next.zRot, VARIABLE_LIMITS.rotation);
+
+  if (next.scale !== undefined) next.scale = clamp(next.scale, VARIABLE_LIMITS.scaleMin, VARIABLE_LIMITS.scaleMax);
+  if (next.extendScale !== undefined) {
+    next.extendScale = clamp(next.extendScale, VARIABLE_LIMITS.extendScaleMin, VARIABLE_LIMITS.extendScaleMax);
+  }
+
+  if (next.extendXrot !== undefined) next.extendXrot = wrapSigned(next.extendXrot, VARIABLE_LIMITS.rotation);
+  if (next.extendYrot !== undefined) next.extendYrot = wrapSigned(next.extendYrot, VARIABLE_LIMITS.rotation);
+  if (next.extendZrot !== undefined) next.extendZrot = wrapSigned(next.extendZrot, VARIABLE_LIMITS.rotation);
+
+  if (next.xBasePos !== undefined) next.xBasePos = clamp(next.xBasePos, -VARIABLE_LIMITS.basePos, VARIABLE_LIMITS.basePos);
+  if (next.yBasePos !== undefined) next.yBasePos = clamp(next.yBasePos, -VARIABLE_LIMITS.basePos, VARIABLE_LIMITS.basePos);
+  if (next.zBasePos !== undefined) next.zBasePos = clamp(next.zBasePos, -VARIABLE_LIMITS.basePos, VARIABLE_LIMITS.basePos);
+
+  return next;
+}
+
 export function toTransform(input: {
   xOffset?: unknown;
   yOffset?: unknown;
@@ -47,7 +98,7 @@ export function toTransform(input: {
   yBasePos?: unknown;
   zBasePos?: unknown;
 }): StoredTransform {
-  return {
+  return normalizeTransform({
     xOffset: asNumber(input.xOffset),
     yOffset: asNumber(input.yOffset),
     zOffset: asNumber(input.zOffset),
@@ -62,7 +113,7 @@ export function toTransform(input: {
     xBasePos: asNumber(input.xBasePos),
     yBasePos: asNumber(input.yBasePos),
     zBasePos: asNumber(input.zBasePos),
-  };
+  });
 }
 
 export function transformToRenderVariables(transform: StoredTransform): FmbeRenderVariables {
@@ -84,7 +135,7 @@ export function transformToRenderVariables(transform: StoredTransform): FmbeRend
 }
 
 export function renderVariablesToTransform(variables: FmbeRenderVariables, extendZrot?: number): StoredTransform {
-  return {
+  return normalizeTransform({
     xOffset: variables.xpos,
     yOffset: variables.ypos,
     zOffset: variables.zpos,
@@ -99,7 +150,7 @@ export function renderVariablesToTransform(variables: FmbeRenderVariables, exten
     xBasePos: variables.xbasepos,
     yBasePos: variables.ybasepos,
     zBasePos: variables.zbasepos,
-  };
+  });
 }
 
 export function presetFromBlockEnum(preset: string): FmbePreset {

@@ -1,6 +1,6 @@
 import { world } from "@minecraft/server";
 import { MinecraftDimensionTypes } from "@minecraft/vanilla-data";
-import { now, parseTransformJson } from "./helpers.ts";
+import { normalizeTransform, now, parseTransformJson } from "./helpers.ts";
 import { type FmbeRecord } from "./types.ts";
 
 const STORE_KEY = "fmbe:records";
@@ -51,7 +51,7 @@ function toRecord(row: Record<string, unknown>): FmbeRecord {
     x: Number(row.x ?? 0),
     y: Number(row.y ?? 0),
     z: Number(row.z ?? 0),
-    transform: transformFromRow ?? parseTransformJson(row.transformJson),
+    transform: normalizeTransform(transformFromRow ?? parseTransformJson(row.transformJson)),
     updatedAt: Number(row.updatedAt ?? now()),
   };
 }
@@ -62,7 +62,7 @@ export function ensureSchema(): void {
 
 export function upsertRecord(record: FmbeRecord): void {
   ensureLoaded();
-  records.set(record.id, { ...record });
+  records.set(record.id, { ...record, transform: normalizeTransform(record.transform) });
   save();
 }
 

@@ -1,7 +1,7 @@
 import { system, world } from "@minecraft/server";
 import { getAllRecords, getRecordById, upsertRecord } from "./db.ts";
 import { applyRecordToEntity, getAllManagedEntities } from "./entities.ts";
-import { DP_ID, now } from "./helpers.ts";
+import { DP_ID, normalizeTransform, now } from "./helpers.ts";
 import {
   readGroupOperation,
   readGroupScores,
@@ -80,6 +80,8 @@ function applyGroupRelativeOperation(record: FmbeRecord, operation: GroupOperati
       break;
     }
   }
+
+  next.transform = normalizeTransform(next.transform);
 
   return next;
 }

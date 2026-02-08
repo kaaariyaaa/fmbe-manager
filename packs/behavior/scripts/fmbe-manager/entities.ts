@@ -12,6 +12,7 @@ import {
   DP_PRESET,
   asNumber,
   getOriginPlayer,
+  normalizeTransform,
   renderVariablesToTransform,
   transformToRenderVariables,
 } from "./helpers.ts";
@@ -83,20 +84,22 @@ export function isManagedEntity(entity: Entity): boolean {
 }
 
 export function applyRecordToEntity(entity: Entity, record: FmbeRecord): void {
+  const normalizedTransform = normalizeTransform(record.transform);
+
   entity.setDynamicProperty(DP_MANAGED, true);
   entity.setDynamicProperty(DP_ID, record.id);
   entity.setDynamicProperty(DP_PRESET, record.preset);
   entity.setDynamicProperty(DP_BLOCK, record.blockTypeId ?? undefined);
   entity.setDynamicProperty(DP_ITEM, record.itemTypeId ?? undefined);
-  entity.setDynamicProperty(DP_EXTEND_ZROT, record.transform.extendZrot ?? undefined);
+  entity.setDynamicProperty(DP_EXTEND_ZROT, normalizedTransform.extendZrot ?? undefined);
   ensureManagedTag(entity);
   syncIdTag(entity, record.id);
   syncEntityGroupMembership(entity, record.id);
-  syncEntityScores(entity, record);
+  syncEntityScores(entity, { ...record, transform: normalizedTransform });
 
   defaultFmbeManager.applyRenderData(entity, {
     type: presetToRenderType(record.preset),
-    variables: transformToRenderVariables(record.transform),
+    variables: transformToRenderVariables(normalizedTransform),
   });
 
   enforceMainhand(entity, record);
