@@ -4,29 +4,29 @@ import { type FmbeRecord, type StoredTransform } from "./types.ts";
 const SCALE = 1000;
 
 const SCORE_OBJECTIVES: Record<keyof StoredTransform, string> = {
-  xOffset: "fmbe_xof",
-  yOffset: "fmbe_yof",
-  zOffset: "fmbe_zof",
-  xRot: "fmbe_xrot",
-  yRot: "fmbe_yrot",
-  zRot: "fmbe_zrot",
-  scale: "fmbe_scl",
-  extendScale: "fmbe_escl",
-  extendXrot: "fmbe_exrt",
-  extendYrot: "fmbe_eyrt",
-  extendZrot: "fmbe_ezrt",
-  xBasePos: "fmbe_xbas",
-  yBasePos: "fmbe_ybas",
-  zBasePos: "fmbe_zbas",
+  xOffset: "fmbe:xOffset",
+  yOffset: "fmbe:yOffset",
+  zOffset: "fmbe:zOffset",
+  xRot: "fmbe:xRot",
+  yRot: "fmbe:yRot",
+  zRot: "fmbe:zRot",
+  scale: "fmbe:scl",
+  extendScale: "fmbe:extendScale",
+  extendXrot: "fmbe:extendXrot",
+  extendYrot: "fmbe:extendYrot",
+  extendZrot: "fmbe:extendZrot",
+  xBasePos: "fmbe:xBasePos",
+  yBasePos: "fmbe:yBasePos",
+  zBasePos: "fmbe:zBasePos",
 };
 
 const LOCATION_OBJECTIVES = {
-  x: "fmbe_locx",
-  y: "fmbe_locy",
-  z: "fmbe_locz",
+  x: "fmbe:locationX",
+  y: "fmbe:locationY",
+  z: "fmbe:locationZ",
 } as const;
 
-const PRESET_OBJECTIVE = "fmbe_prst";
+const PRESET_OBJECTIVE = "fmbe:preset";
 
 const PRESET_TO_SCORE: Record<FmbeRecord["preset"], number> = {
   item: 0,
