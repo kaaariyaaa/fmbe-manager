@@ -18,6 +18,7 @@ import {
 import { now } from "./helpers.ts";
 import { type FmbePreset, type FmbeRecord } from "./types.ts";
 import { removeEntityScores, syncEntityScores } from "./scoreboard.ts";
+import { clearEntityGroupMembership, syncEntityGroupMembership } from "./groups.ts";
 
 const ID_TAG_PREFIX = "fmbe:";
 const MANAGED_TAG = "fmbe";
@@ -90,6 +91,7 @@ export function applyRecordToEntity(entity: Entity, record: FmbeRecord): void {
   entity.setDynamicProperty(DP_EXTEND_ZROT, record.transform.extendZrot ?? undefined);
   ensureManagedTag(entity);
   syncIdTag(entity, record.id);
+  syncEntityGroupMembership(entity, record.id);
   syncEntityScores(entity, record);
 
   defaultFmbeManager.applyRenderData(entity, {
@@ -102,6 +104,7 @@ export function applyRecordToEntity(entity: Entity, record: FmbeRecord): void {
 
 export function removeManagedEntity(entity: Entity): void {
   removeEntityScores(entity);
+  clearEntityGroupMembership(entity);
   entity.removeTag(MANAGED_TAG);
   for (const tag of entity.getTags()) {
     if (tag.startsWith(ID_TAG_PREFIX)) entity.removeTag(tag);

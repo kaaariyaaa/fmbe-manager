@@ -16,7 +16,19 @@ import { MinecraftDimensionTypes } from "@minecraft/vanilla-data";
 import { addPendingGet } from "./state.ts";
 import { getAllRecords, getRecordById, removeRecordById, upsertRecord } from "./db.ts";
 import {
+  clearRecordGroup,
+  createGroup,
+  deleteGroup,
+  getGroupForRecord,
+  getGroupMembers,
+  hasGroup,
+  listGroups,
+  removeRecordFromGroups,
+  setRecordGroup,
+} from "./groups.ts";
+import {
   applyRecordToEntity,
+  findEntityByFmbeId,
   getAllManagedEntities,
   isManagedEntity,
   removeManagedEntity,
@@ -37,6 +49,7 @@ import {
   toTransform,
 } from "./helpers.ts";
 import { type FmbeDataMode, type FmbeRecord } from "./types.ts";
+import { readGroupScores, removeGroupScores } from "./scoreboard.ts";
 
 function registerManagedCommand(
   registry: CustomCommandRegistry,
@@ -90,6 +103,13 @@ function getEntityRecordOrThrow(target: Entity): FmbeRecord {
   const row = getRecordById(targetId);
   if (!row) throw new Error(`record missing for ${targetId}`);
   return row;
+}
+
+function validateGroupName(value: unknown): string {
+  const groupName = String(value ?? "").trim();
+  if (groupName.length === 0) throw new Error("group must not be empty.");
+  if (groupName.length > 64) throw new Error("group name too long.");
+  return groupName;
 }
 
 export function registerCommands(): void {
@@ -204,6 +224,166 @@ export function registerCommands(): void {
 
         sendToOrigin(origin, `§b[FMBE] ${filtered.length} entries`);
         for (const row of filtered) sendToOrigin(origin, `§7- ${formatRecord(row)}`);
+      }
+    );
+
+    registerManagedCommand(
+      registry,
+      {
+        ...commandBase("fmbe:group_create", "Create group"),
+        mandatoryParameters: [{ type: CustomCommandParamType.String, name: "group" }],
+      },
+      (origin, group) => {
+        const groupName = validateGroupName(group);
+        if (!createGroup(groupName)) throw new Error(`group already exists: ${groupName}`);
+        sendToOrigin(origin, `§a[FMBE] group created: ${groupName}`);
+      }
+    );
+
+    registerManagedCommand(
+      registry,
+      {
+        ...commandBase("fmbe:group_delete", "Delete group"),
+        mandatoryParameters: [{ type: CustomCommandParamType.String, name: "group" }],
+      },
+      (origin, group) => {
+        const groupName = validateGroupName(group);
+        const removedMembers = deleteGroup(groupName);
+        if (!removedMembers) throw new Error(`group not found: ${groupName}`);
+
+        removeGroupScores(groupName);
+        for (const id of removedMembers) {
+          const ent = findEntityByFmbeId(id);
+          const row = getRecordById(id);
+          if (!ent || !row) continue;
+          applyRecordToEntity(ent, row);
+        }
+        sendToOrigin(origin, `§a[FMBE] group deleted: ${groupName} members=${removedMembers.length}`);
+      }
+    );
+
+    registerManagedCommand(
+      registry,
+      {
+        ...commandBase("fmbe:group_list", "List groups"),
+        optionalParameters: [{ type: CustomCommandParamType.String, name: "group" }],
+      },
+      (origin, group) => {
+        const groupNameArg = typeof group === "string" ? group.trim() : "";
+        if (groupNameArg.length > 0) {
+          if (!hasGroup(groupNameArg)) throw new Error(`group not found: ${groupNameArg}`);
+
+          const members = getGroupMembers(groupNameArg);
+          sendToOrigin(origin, `§b[FMBE] group=${groupNameArg} members=${members.length}`);
+          for (const id of members) {
+            const row = getRecordById(id);
+            if (!row) continue;
+            sendToOrigin(origin, `§7- ${formatRecord(row)}`);
+          }
+          return;
+        }
+
+        const groups = listGroups();
+        if (groups.length === 0) {
+          sendToOrigin(origin, "§e[FMBE] no groups.");
+          return;
+        }
+
+        sendToOrigin(origin, `§b[FMBE] groups=${groups.length}`);
+        for (const groupName of groups) {
+          sendToOrigin(origin, `§7- ${groupName} members=${getGroupMembers(groupName).length}`);
+        }
+      }
+    );
+
+    registerManagedCommand(
+      registry,
+      {
+        ...commandBase("fmbe:group_move", "Move FMBE to another group"),
+        mandatoryParameters: [
+          { type: CustomCommandParamType.EntitySelector, name: "entity" },
+          { type: CustomCommandParamType.String, name: "toGroup" },
+        ],
+      },
+      (origin, entity, toGroup) => {
+        const target = entity as Entity | undefined;
+        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
+
+        const nextGroup = validateGroupName(toGroup);
+        if (!hasGroup(nextGroup)) throw new Error(`group not found: ${nextGroup}`);
+
+        const row = getEntityRecordOrThrow(target);
+        const prevGroup = getGroupForRecord(row.id);
+        if (!prevGroup) throw new Error("entity is not in a group. use fmbe:group_set first.");
+        if (prevGroup === nextGroup) throw new Error("entity is already in that group.");
+
+        setRecordGroup(row.id, nextGroup);
+        applyRecordToEntity(target, row);
+        sendToOrigin(origin, `§a[FMBE] moved ${row.id}: ${prevGroup} -> ${nextGroup}`);
+      }
+    );
+
+    registerManagedCommand(
+      registry,
+      {
+        ...commandBase("fmbe:group_info", "Show group info"),
+        mandatoryParameters: [{ type: CustomCommandParamType.String, name: "group" }],
+      },
+      (origin, group) => {
+        const groupName = validateGroupName(group);
+        if (!hasGroup(groupName)) throw new Error(`group not found: ${groupName}`);
+
+        const members = getGroupMembers(groupName);
+        sendToOrigin(origin, `§b[FMBE] group=${groupName} members=${members.length}`);
+        for (const id of members) sendToOrigin(origin, `§7- ${id}`);
+
+        const first = members.map((id) => getRecordById(id)).find((value) => value !== undefined);
+        if (!first) return;
+        const view = readGroupScores(groupName, first).record;
+        sendToOrigin(origin, `§7preset=${presetToDisplay(view.preset)} loc=(${view.x.toFixed(2)}, ${view.y.toFixed(2)}, ${view.z.toFixed(2)})`);
+      }
+    );
+
+    registerManagedCommand(
+      registry,
+      {
+        ...commandBase("fmbe:group_set", "Assign entity to group"),
+        mandatoryParameters: [
+          { type: CustomCommandParamType.String, name: "group" },
+          { type: CustomCommandParamType.EntitySelector, name: "entity" },
+        ],
+      },
+      (origin, group, entity) => {
+        const groupName = validateGroupName(group);
+        const target = entity as Entity | undefined;
+        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
+
+        if (!hasGroup(groupName)) throw new Error(`group not found: ${groupName}`);
+
+        const row = getEntityRecordOrThrow(target);
+        setRecordGroup(row.id, groupName);
+        applyRecordToEntity(target, row);
+        sendToOrigin(origin, `§a[FMBE] ${row.id} -> group ${groupName}`);
+      }
+    );
+
+    registerManagedCommand(
+      registry,
+      {
+        ...commandBase("fmbe:group_clear", "Remove entity from group"),
+        mandatoryParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
+      },
+      (origin, entity) => {
+        const target = entity as Entity | undefined;
+        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
+
+        const row = getEntityRecordOrThrow(target);
+        const prev = getGroupForRecord(row.id);
+        if (!prev) throw new Error("entity is not in a group.");
+
+        clearRecordGroup(row.id);
+        applyRecordToEntity(target, row);
+        sendToOrigin(origin, `§a[FMBE] ${row.id} removed from group ${prev}`);
       }
     );
 
@@ -391,6 +571,7 @@ export function registerCommands(): void {
         if (!target) throw new Error("target not found. specify entity or hit target first.");
 
         const row = getEntityRecordOrThrow(target);
+        removeRecordFromGroups(row.id);
         removeRecordById(row.id);
         removeManagedEntity(target);
         sendToOrigin(origin, `§a[FMBE] removed: ${row.id}`);
@@ -433,6 +614,7 @@ export function registerCommands(): void {
 
           for (const [fmbeId] of dbMap) {
             if (!entityMap.has(fmbeId)) {
+              removeRecordFromGroups(fmbeId);
               removeRecordById(fmbeId);
               removedDb++;
             }
