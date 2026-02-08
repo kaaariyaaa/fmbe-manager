@@ -34,19 +34,22 @@ function getEnglishHelpLines(command: string): string[] {
     case "list":
       return ["/fmbe:list ?preset:<Item|2D|3D>"];
     case "get":
-      return ["/fmbe:get ?entity:<EntitySelector>"];
+      return [
+        "/fmbe:get ?entity:<EntitySelector>",
+        "If entity is omitted, run get first then hit an FMBE to inspect.",
+      ];
     case "set_preset":
-      return ["/fmbe:set_preset preset:<Item|2D|3D> ?entity:<EntitySelector>"];
+      return ["/fmbe:set_preset preset:<Item|2D|3D> entity:<EntitySelector>"];
     case "set_block":
-      return ["/fmbe:set_block block:<BlockType> ?entity:<EntitySelector>"];
+      return ["/fmbe:set_block block:<BlockType> entity:<EntitySelector>"];
     case "set_item":
-      return ["/fmbe:set_item item:<ItemType> ?entity:<EntitySelector>"];
+      return ["/fmbe:set_item item:<ItemType> entity:<EntitySelector>"];
     case "set_location":
-      return ["/fmbe:set_location location:<Location> ?entity:<EntitySelector>"];
+      return ["/fmbe:set_location location:<Location> entity:<EntitySelector>"];
     case "clone":
       return ["/fmbe:clone fromEntity:<EntitySelector> ?toEntity:<EntitySelector> ?location:<Location>"];
     case "remove":
-      return ["/fmbe:remove ?entity:<EntitySelector>"];
+      return ["/fmbe:remove entity:<EntitySelector>"];
     case "data":
       return ["/fmbe:data content:<cleanup|fix|validate> ?entity:<EntitySelector>"];
     case "group_create":
@@ -97,19 +100,23 @@ function getJapaneseHelpLines(command: string): string[] {
     case "list":
       return ["/fmbe:list ?preset:<Item|2D|3D>", "FMBE一覧を表示します"];
     case "get":
-      return ["/fmbe:get ?entity:<EntitySelector>", "対象FMBEの情報を表示します"];
+      return [
+        "/fmbe:get ?entity:<EntitySelector>",
+        "対象FMBEの情報を表示します",
+        "entity省略時はget実行後に最初に殴ったFMBEを表示します",
+      ];
     case "set_preset":
-      return ["/fmbe:set_preset preset:<Item|2D|3D> ?entity:<EntitySelector>", "対象FMBEのPresetを変更します"];
+      return ["/fmbe:set_preset preset:<Item|2D|3D> entity:<EntitySelector>", "対象FMBEのPresetを変更します"];
     case "set_block":
-      return ["/fmbe:set_block block:<BlockType> ?entity:<EntitySelector>", "対象FMBEのBlockを変更します"];
+      return ["/fmbe:set_block block:<BlockType> entity:<EntitySelector>", "対象FMBEのBlockを変更します"];
     case "set_item":
-      return ["/fmbe:set_item item:<ItemType> ?entity:<EntitySelector>", "対象FMBEのItemを変更します"];
+      return ["/fmbe:set_item item:<ItemType> entity:<EntitySelector>", "対象FMBEのItemを変更します"];
     case "set_location":
-      return ["/fmbe:set_location location:<Location> ?entity:<EntitySelector>", "対象FMBEの位置を変更します"];
+      return ["/fmbe:set_location location:<Location> entity:<EntitySelector>", "対象FMBEの位置を変更します"];
     case "clone":
       return ["/fmbe:clone fromEntity:<EntitySelector> ?toEntity:<EntitySelector> ?location:<Location>", "FMBEを複製します"];
     case "remove":
-      return ["/fmbe:remove ?entity:<EntitySelector>", "対象FMBEを削除します"];
+      return ["/fmbe:remove entity:<EntitySelector>", "対象FMBEを削除します"];
     case "data":
       return ["/fmbe:data content:<cleanup|fix|validate> ?entity:<EntitySelector>", "データ整合性を処理します"];
     case "group_create":

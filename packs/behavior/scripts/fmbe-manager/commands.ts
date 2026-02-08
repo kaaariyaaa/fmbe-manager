@@ -32,7 +32,6 @@ import {
   getAllManagedEntities,
   isManagedEntity,
   removeManagedEntity,
-  resolveTargetEntity,
   spawnFromRecord,
   toEntityRecord,
 } from "./entities.ts";
@@ -417,9 +416,10 @@ export function registerCommands(): void {
         optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
       },
       (origin, entity) => {
-        const target = resolveTargetEntity(origin, entity as Entity | undefined);
-        if (target) {
-          const row = getEntityRecordOrThrow(target);
+        const selected = entity as Entity | undefined;
+        if (selected) {
+          if (!isManagedEntity(selected)) throw new Error("entity must be an FMBE.");
+          const row = getEntityRecordOrThrow(selected);
           sendToOrigin(origin, `§b[FMBE] ${formatRecord(row)}`);
           sendToOrigin(origin, `§7transform=${JSON.stringify(row.transform)}`);
           return;
@@ -436,12 +436,14 @@ export function registerCommands(): void {
       registry,
       {
         ...commandBase("fmbe:set_preset", "Set preset"),
-        mandatoryParameters: [{ type: CustomCommandParamType.Enum, name: "preset", enumName: "fmbe:set_preset" }],
-        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
+        mandatoryParameters: [
+          { type: CustomCommandParamType.Enum, name: "preset", enumName: "fmbe:set_preset" },
+          { type: CustomCommandParamType.EntitySelector, name: "entity" },
+        ],
       },
       (origin, preset, entity) => {
-        const target = resolveTargetEntity(origin, entity as Entity | undefined);
-        if (!target) throw new Error("target not found. specify entity or hit target first.");
+        const target = entity as Entity | undefined;
+        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
 
         const row = getEntityRecordOrThrow(target);
         const nextPreset = presetFromAnyEnum(String(preset));
@@ -456,12 +458,14 @@ export function registerCommands(): void {
       registry,
       {
         ...commandBase("fmbe:set_block", "Set block type"),
-        mandatoryParameters: [{ type: CustomCommandParamType.BlockType, name: "block" }],
-        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
+        mandatoryParameters: [
+          { type: CustomCommandParamType.BlockType, name: "block" },
+          { type: CustomCommandParamType.EntitySelector, name: "entity" },
+        ],
       },
       (origin, block, entity) => {
-        const target = resolveTargetEntity(origin, entity as Entity | undefined);
-        if (!target) throw new Error("target not found. specify entity or hit target first.");
+        const target = entity as Entity | undefined;
+        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
 
         const row = getEntityRecordOrThrow(target);
         const next: FmbeRecord = {
@@ -480,12 +484,14 @@ export function registerCommands(): void {
       registry,
       {
         ...commandBase("fmbe:set_item", "Set item type"),
-        mandatoryParameters: [{ type: CustomCommandParamType.ItemType, name: "item" }],
-        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
+        mandatoryParameters: [
+          { type: CustomCommandParamType.ItemType, name: "item" },
+          { type: CustomCommandParamType.EntitySelector, name: "entity" },
+        ],
       },
       (origin, item, entity) => {
-        const target = resolveTargetEntity(origin, entity as Entity | undefined);
-        if (!target) throw new Error("target not found. specify entity or hit target first.");
+        const target = entity as Entity | undefined;
+        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
 
         const row = getEntityRecordOrThrow(target);
         const next: FmbeRecord = {
@@ -504,12 +510,14 @@ export function registerCommands(): void {
       registry,
       {
         ...commandBase("fmbe:set_location", "Set FMBE location"),
-        mandatoryParameters: [{ type: CustomCommandParamType.Location, name: "location" }],
-        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
+        mandatoryParameters: [
+          { type: CustomCommandParamType.Location, name: "location" },
+          { type: CustomCommandParamType.EntitySelector, name: "entity" },
+        ],
       },
       (origin, location, entity) => {
-        const target = resolveTargetEntity(origin, entity as Entity | undefined);
-        if (!target) throw new Error("target not found. specify entity or hit target first.");
+        const target = entity as Entity | undefined;
+        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
 
         const row = getEntityRecordOrThrow(target);
         const pos = location as Vector3;
@@ -587,11 +595,11 @@ export function registerCommands(): void {
       registry,
       {
         ...commandBase("fmbe:remove", "Remove FMBE"),
-        optionalParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
+        mandatoryParameters: [{ type: CustomCommandParamType.EntitySelector, name: "entity" }],
       },
       (origin, entity) => {
-        const target = resolveTargetEntity(origin, entity as Entity | undefined);
-        if (!target) throw new Error("target not found. specify entity or hit target first.");
+        const target = entity as Entity | undefined;
+        if (!target || !isManagedEntity(target)) throw new Error("entity must be an FMBE.");
 
         const row = getEntityRecordOrThrow(target);
         removeRecordFromGroups(row.id);
