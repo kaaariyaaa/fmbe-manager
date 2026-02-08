@@ -50,6 +50,7 @@ import {
 } from "./helpers.ts";
 import { type FmbeDataMode, type FmbeRecord } from "./types.ts";
 import { readGroupScores, removeGroupScores } from "./scoreboard.ts";
+import { getHelpLines, HELP_COMMAND_OPTIONS, HELP_LANGUAGE_OPTIONS } from "./help.ts";
 
 function registerManagedCommand(
   registry: CustomCommandRegistry,
@@ -120,6 +121,27 @@ export function registerCommands(): void {
     registry.registerEnum("fmbe:list_preset", ["Item", "2D", "3D"]);
     registry.registerEnum("fmbe:set_preset", ["Item", "2D", "3D"]);
     registry.registerEnum("fmbe:data_content", ["cleanup", "fix", "validate"]);
+    registry.registerEnum("fmbe:help_language", [...HELP_LANGUAGE_OPTIONS]);
+    registry.registerEnum("fmbe:help_command", [...HELP_COMMAND_OPTIONS]);
+
+    registerManagedCommand(
+      registry,
+      {
+        ...commandBase("fmbe:help", "Show command usage"),
+        mandatoryParameters: [
+          { type: CustomCommandParamType.Enum, name: "language", enumName: "fmbe:help_language" },
+          { type: CustomCommandParamType.Enum, name: "command", enumName: "fmbe:help_command" },
+        ],
+      },
+      (origin, language, command) => {
+        const lang = String(language);
+        const name = String(command);
+        sendToOrigin(origin, `§b[FMBE] help(${lang}): ${name}`);
+        for (const line of getHelpLines(lang, name)) {
+          sendToOrigin(origin, `§7${line}`);
+        }
+      }
+    );
 
     registerManagedCommand(
       registry,
@@ -172,9 +194,9 @@ export function registerCommands(): void {
         ...commandBase("fmbe:new_item", "Create a new FMBE item"),
         mandatoryParameters: [
           { type: CustomCommandParamType.ItemType, name: "item" },
-          { type: CustomCommandParamType.Location, name: "location" },
         ],
         optionalParameters: [
+          { type: CustomCommandParamType.Location, name: "location" },
           { type: CustomCommandParamType.Float, name: "xOffset" },
           { type: CustomCommandParamType.Float, name: "yOffset" },
           { type: CustomCommandParamType.Float, name: "zOffset" },
@@ -186,7 +208,8 @@ export function registerCommands(): void {
         const itemTypeId = (item as ItemType).id;
         const sourcePlayer = getOriginPlayer(origin);
         const sourceDimensionId = sourcePlayer?.dimension.id ?? MinecraftDimensionTypes.Overworld;
-        const spawnLocation = location as Vector3;
+        const sourceLocation = sourcePlayer?.location ?? { x: 0, y: 80, z: 0 };
+        const spawnLocation = (location as Vector3 | undefined) ?? sourceLocation;
 
         const record: FmbeRecord = {
           id: fmbeId,
